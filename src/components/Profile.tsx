@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useAuth, Position } from '../context/AuthContext';
+import { useActivity } from '../context/ActivityContext';
 
 export default function Profile() {
   const { currentUser, updateUser } = useAuth();
+  const { activities } = useActivity();
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState({
     fullName: currentUser?.fullName || '',
@@ -50,13 +52,22 @@ export default function Profile() {
     setTimeout(() => setSaved(false), 3000);
   };
 
-  const activityLog = [
-    { action: 'Вход в систему', time: '15.01.2026, 09:15', ip: '192.168.1.45' },
-    { action: 'Изменение документа №247-П', time: '14.01.2026, 16:42', ip: '192.168.1.45' },
-    { action: 'Просмотр статистики', time: '14.01.2026, 14:20', ip: '192.168.1.45' },
-    { action: 'Выход из системы', time: '13.01.2026, 18:30', ip: '192.168.1.45' },
-    { action: 'Вход в систему', time: '13.01.2026, 08:55', ip: '192.168.1.45' },
-  ];
+  const formatTimestamp = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'только что';
+    if (diffMins < 60) return `${diffMins} мин назад`;
+    if (diffHours < 24) return `${diffHours} ч назад`;
+    if (diffDays < 7) return `${diffDays} дн назад`;
+    return date.toLocaleDateString('ru-RU');
+  };
+
+  const myActivities = activities.filter(a => a.userId === currentUser.id).slice(0, 20);
 
   return (
     <div className="space-y-6">
@@ -199,27 +210,40 @@ export default function Profile() {
         </div>
       </div>
 
-      {/* Activity Log */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="p-5 border-b border-gray-100">
-          <h3 className="text-lg font-semibold text-gray-800">Журнал активности</h3>
-        </div>
-        <div className="divide-y divide-gray-50">
-          {activityLog.map((log, index) => (
-            <div key={index} className="p-4 flex items-center gap-4 hover:bg-gray-50 transition-colors">
-              <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+      {/* Real Activity Log */}
+      {myActivities.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="p-5 border-b border-gray-100">
+            <h3 className="text-lg font-semibold text-gray-800">Журнал активности</h3>
+            <p className="text-xs text-gray-500 mt-0.5">Последние {myActivities.length} действий</p>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {myActivities.map((activity) => (
+              <div key={activity.id} className="p-4 flex items-center gap-4 hover:bg-gray-50 transition-colors">
+                <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-800">{activity.description}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{formatTimestamp(activity.timestamp)}</p>
+                </div>
               </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-gray-800">{log.action}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{log.time} • IP: {log.ip}</p>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
+
+      {myActivities.length === 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-8 text-center">
+          <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p className="text-sm text-gray-400">Журнал активности пуст</p>
+          <p className="text-xs text-gray-400 mt-1">Ваши действия будут отображаться здесь</p>
+        </div>
+      )}
     </div>
   );
 }

@@ -22,6 +22,28 @@ export default function Documents() {
     uploadedByName: currentUser?.fullName || '',
   });
 
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      const sizeInMB = (file.size / (1024 * 1024)).toFixed(2);
+      setNewDoc({...newDoc, size: `${sizeInMB} МБ`});
+      
+      // Auto-detect format
+      const ext = file.name.split('.').pop()?.toUpperCase();
+      if (ext && ['PDF', 'DOCX', 'XLSX', 'DOC', 'XLS'].includes(ext)) {
+        setNewDoc(prev => ({...prev, format: ext === 'DOC' ? 'DOCX' : ext === 'XLS' ? 'XLSX' : ext}));
+      }
+      
+      // Auto-fill title if empty
+      if (!newDoc.title) {
+        setNewDoc(prev => ({...prev, title: file.name.replace(/\.[^/.]+$/, '')}));
+      }
+    }
+  };
+
   const categories = [
     { id: 'all', label: 'Все документы' },
     { id: 'laws', label: 'Законы и кодексы' },
@@ -48,6 +70,7 @@ export default function Documents() {
       size: newDoc.size || '1 МБ',
     });
     setShowAddModal(false);
+    setSelectedFile(null);
     setNewDoc({
       title: '',
       description: '',
@@ -282,6 +305,44 @@ export default function Documents() {
                   <strong>Внимание:</strong> Документ будет отправлен на модерацию. Администратор или владелец должен одобрить его перед публикацией.
                 </p>
               </div>
+              
+              {/* File Upload */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Файл документа</label>
+                <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center hover:border-blue-400 transition-colors">
+                  <input
+                    type="file"
+                    id="file-upload"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    accept=".pdf,.doc,.docx,.xls,.xlsx"
+                  />
+                  <label htmlFor="file-upload" className="cursor-pointer">
+                    <svg className="w-8 h-8 mx-auto text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    {selectedFile ? (
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">{selectedFile.name}</p>
+                        <p className="text-xs text-gray-500 mt-1">{(selectedFile.size / 1024 / 1024).toFixed(2)} МБ</p>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.preventDefault(); setSelectedFile(null); setNewDoc({...newDoc, size: ''}); }}
+                          className="text-xs text-red-600 hover:text-red-700 mt-2"
+                        >
+                          Удалить файл
+                        </button>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-sm text-gray-600">Нажмите для выбора файла</p>
+                        <p className="text-xs text-gray-400 mt-1">PDF, DOC, DOCX, XLS, XLSX</p>
+                      </div>
+                    )}
+                  </label>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Название *</label>
                 <input

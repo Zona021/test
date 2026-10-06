@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useActivity } from '../context/ActivityContext';
 
 interface HeaderProps {
   onMenuToggle: () => void;
@@ -7,14 +8,12 @@ interface HeaderProps {
 
 export default function Header({ onMenuToggle }: HeaderProps) {
   const { currentUser, logout } = useAuth();
+  const { getUserNotifications, getUnreadCount, markNotificationRead, notifications } = useActivity();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
 
-  const notifications = [
-    { id: 1, text: 'Новое постановление №247-П от 15.01.2026', time: '10 мин назад', type: 'important' },
-    { id: 2, text: 'Обновлены данные по участкам', time: '1 час назад', type: 'info' },
-    { id: 3, text: 'Заседание комиссии перенесено на 18:00', time: '3 часа назад', type: 'warning' },
-  ];
+  const userNotifications = currentUser ? getUserNotifications(currentUser.id) : [];
+  const unreadCount = currentUser ? getUnreadCount(currentUser.id) : 0;
 
   const getRoleBadge = (role: string) => {
     switch (role) {
@@ -22,6 +21,30 @@ export default function Header({ onMenuToggle }: HeaderProps) {
       case 'admin': return <span className="px-1.5 py-0.5 text-[10px] font-bold bg-blue-100 text-blue-700 rounded">АДМИН</span>;
       case 'editor': return <span className="px-1.5 py-0.5 text-[10px] font-bold bg-green-100 text-green-700 rounded">РЕДАКТОР</span>;
       default: return <span className="px-1.5 py-0.5 text-[10px] font-bold bg-gray-100 text-gray-600 rounded">ПРОСМОТР</span>;
+    }
+  };
+
+  const formatTimestamp = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'только что';
+    if (diffMins < 60) return `${diffMins} мин назад`;
+    if (diffHours < 24) return `${diffHours} ч назад`;
+    if (diffDays < 7) return `${diffDays} дн назад`;
+    return date.toLocaleDateString('ru-RU');
+  };
+
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'success': return 'bg-green-500';
+      case 'warning': return 'bg-yellow-500';
+      case 'error': return 'bg-red-500';
+      default: return 'bg-blue-500';
     }
   };
 
@@ -89,28 +112,50 @@ export default function Header({ onMenuToggle }: HeaderProps) {
               <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
               </svg>
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+              {unreadCount > 0 && (
+                <span className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
             </button>
             
             {showNotifications && (
               <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-                <div className="p-4 border-b border-gray-100 bg-gray-50">
+                <div className="p-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
                   <h3 className="font-semibold text-gray-800">Уведомления</h3>
+                  {unreadCount > 0 && (
+                    <span className="text-xs text-gray-500">{unreadCount} непрочитанных</span>
+                  )}
                 </div>
-                <div className="max-h-64 overflow-y-auto">
-                  {notifications.map(n => (
-                    <div key={n.id} className="p-4 border-b border-gray-50 hover:bg-gray-50 cursor-pointer">
-                      <div className="flex items-start gap-3">
-                        <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${
-                          n.type === 'important' ? 'bg-red-500' : n.type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500'
-                        }`}></div>
-                        <div>
-                          <p className="text-sm text-gray-700">{n.text}</p>
-                          <p className="text-xs text-gray-400 mt-1">{n.time}</p>
+                <div className="max-h-96 overflow-y-auto">
+                  {userNotifications.length === 0 ? (
+                    <div className="p-8 text-center text-gray-400">
+                      <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                      </svg>
+                      <p className="text-sm">Уведомлений нет</p>
+                    </div>
+                  ) : (
+                    userNotifications.map(n => (
+                      <div 
+                        key={n.id} 
+                        className={`p-4 border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors ${!n.read ? 'bg-blue-50/50' : ''}`}
+                        onClick={() => markNotificationRead(n.id)}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${getNotificationIcon(n.type)}`}></div>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-gray-800">{n.title}</p>
+                            <p className="text-xs text-gray-600 mt-1">{n.message}</p>
+                            <p className="text-xs text-gray-400 mt-1">{formatTimestamp(n.timestamp)}</p>
+                          </div>
+                          {!n.read && (
+                            <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
+                          )}
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
             )}
@@ -163,7 +208,6 @@ export default function Header({ onMenuToggle }: HeaderProps) {
                   <div className="py-2">
                     <button
                       onClick={() => {
-                        // Navigate to profile - this will be handled by parent
                         const event = new CustomEvent('navigate', { detail: 'profile' });
                         window.dispatchEvent(event);
                         setShowProfile(false);

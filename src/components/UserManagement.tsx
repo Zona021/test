@@ -100,10 +100,15 @@ export default function UserManagement() {
   };
 
   const canChangeRole = (targetUser: typeof users[0]) => {
-    // Only owner can assign admin role or change owner role
+    // Nobody can change owner role (not even owner)
     if (targetUser.role === 'owner') return false;
+    
+    // Owner can change roles (except owner role)
     if (currentUser.role === 'owner') return true;
-    // Admin cannot assign admin role
+    
+    // Admin can only change editor and viewer roles (not admin or owner)
+    if (currentUser.role === 'admin' && targetUser.role !== 'admin') return true;
+    
     return false;
   };
 
@@ -287,16 +292,15 @@ export default function UserManagement() {
                     !canChangeRole(user) ? 'bg-gray-50 text-gray-400 cursor-not-allowed' : ''
                   }`}
                 >
-                  {currentUser.role === 'owner' && <option value="owner">Владелец</option>}
                   {currentUser.role === 'owner' && <option value="admin">Администратор</option>}
                   <option value="editor">Редактор</option>
                   <option value="viewer">Просмотр</option>
                 </select>
                 {user.role === 'owner' && (
-                  <p className="text-xs text-amber-600 mt-1">Только владелец может изменять роль владельца</p>
+                  <p className="text-xs text-amber-600 mt-1">Роль владельца не может быть изменена</p>
                 )}
-                {currentUser.role === 'admin' && !canChangeRole(user) && (
-                  <p className="text-xs text-gray-500 mt-1">Только владелец может изменять роли</p>
+                {user.role === 'admin' && currentUser.role === 'admin' && (
+                  <p className="text-xs text-gray-500 mt-1">Только владелец может изменять роли администраторов</p>
                 )}
               </div>
               <div>
@@ -378,13 +382,15 @@ export default function UserManagement() {
                     onChange={(e) => setNewUser({...newUser, role: e.target.value as Role})}
                     className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    {currentUser.role === 'owner' && <option value="owner">Владелец</option>}
                     {currentUser.role === 'owner' && <option value="admin">Администратор</option>}
                     <option value="editor">Редактор</option>
                     <option value="viewer">Просмотр</option>
                   </select>
                   {currentUser.role === 'admin' && (
                     <p className="text-xs text-gray-500 mt-1">Администратор не может назначать роль «Администратор»</p>
+                  )}
+                  {currentUser.role === 'owner' && (
+                    <p className="text-xs text-gray-500 mt-1">Роль «Владелец» не может быть назначена</p>
                   )}
                 </div>
               </div>

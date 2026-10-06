@@ -1,11 +1,18 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTasks, TaskPriority } from '../context/TasksContext';
+import { useOperations } from '../context/OperationsContext';
+import { useActivity } from '../context/ActivityContext';
 
 export default function Dashboard() {
   const { currentUser, users, hasPermission } = useAuth();
   const { tasks, addTask, updateTaskStatus, deleteTask } = useTasks();
+  const { createProtocol, createReport, addDataEntry } = useOperations();
+  const { addActivity, activities } = useActivity();
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showProtocolModal, setShowProtocolModal] = useState(false);
+  const [showDataEntryModal, setShowDataEntryModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   const [newTask, setNewTask] = useState({
     title: '',
@@ -13,6 +20,40 @@ export default function Dashboard() {
     assignedTo: '',
     priority: 'medium' as TaskPriority,
     deadline: '',
+  });
+
+  const [newProtocol, setNewProtocol] = useState({
+    number: '',
+    uikNumber: '',
+    createdBy: currentUser?.id || '',
+    createdByName: currentUser?.fullName || '',
+    data: {
+      totalVoters: 0,
+      receivedBallots: 0,
+      votedEarly: 0,
+      votedHome: 0,
+      spoiledBallots: 0,
+      totalVoted: 0,
+    },
+  });
+
+  const [newDataEntry, setNewDataEntry] = useState({
+    type: 'voter_list' as 'voter_list' | 'uik_data' | 'candidate_data',
+    targetId: '',
+    fieldName: '',
+    oldValue: '',
+    newValue: '',
+    changedBy: currentUser?.id || '',
+    changedByName: currentUser?.fullName || '',
+  });
+
+  const [newReport, setNewReport] = useState({
+    title: '',
+    type: 'summary' as 'turnout' | 'processing' | 'complaints' | 'summary',
+    createdBy: currentUser?.id || '',
+    createdByName: currentUser?.fullName || '',
+    period: '',
+    data: {},
   });
 
   if (!currentUser) return null;
@@ -30,16 +71,34 @@ export default function Dashboard() {
   ];
 
   const quickActions = [
-    { label: 'Создать протокол', icon: '📝', action: () => alert('Создание протокола') },
-    { label: 'Внести данные', icon: '📥', action: () => alert('Внесение данных') },
-    { label: 'Сформировать отчёт', icon: '📈', action: () => alert('Формирование отчёта') },
-    { label: 'Назначить задачу', icon: '📨', action: () => hasPermission('edit_documents') && setShowAssignModal(true) },
+    { 
+      label: 'Создать протокол', 
+      icon: '📝', 
+      action: () => setShowProtocolModal(true)
+    },
+    { 
+      label: 'Внести данные', 
+      icon: '📥', 
+      action: () => setShowDataEntryModal(true)
+    },
+    { 
+      label: 'Сформировать отчёт', 
+      icon: '📈', 
+      action: () => setShowReportModal(true)
+    },
+    { 
+      label: 'Назначить задачу', 
+      icon: '📨', 
+      action: () => hasPermission('edit_documents') && setShowAssignModal(true),
+      disabled: !hasPermission('edit_documents')
+    },
   ];
 
   const handleAddTask = () => {
     if (!newTask.title || !newTask.assignedTo || !newTask.deadline) return;
     const assignee = users.find(u => u.id === newTask.assignedTo);
     if (!assignee) return;
+    
     addTask({
       title: newTask.title,
       description: newTask.description,
@@ -50,12 +109,105 @@ export default function Dashboard() {
       priority: newTask.priority,
       deadline: newTask.deadline,
     });
+
+    addActivity({
+      userId: currentUser.id,
+      userName: currentUser.fullName,
+      type: 'task_assign',
+      description: `Назначена задача "${newTask.title}" пользователю ${assignee.fullName}`,
+    });
+
     setShowAssignModal(false);
     setNewTask({ title: '', description: '', assignedTo: '', priority: 'medium', deadline: '' });
   };
 
+  const handleCreateProtocol = () => {
+    if (!newProtocol.number || !newProtocol.uikNumber) return;
+    
+    createProtocol(newProtocol);
+    
+    addActivity({
+      userId: currentUser.id,
+      userName: currentUser.fullName,
+      type: 'document_upload',
+      description: `Создан протокол №${newProtocol.number} для УИК №${newProtocol.uikNumber}`,
+    });
+
+    setShowProtocolModal(false);
+    setNewProtocol({
+      number: '',
+      uikNumber: '',
+      createdBy: currentUser.id,
+      createdByName: currentUser.fullName,
+      data: {
+        totalVoters: 0,
+        receivedBallots: 0,
+        votedEarly: 0,
+        votedHome: 0,
+        spoiledBallots: 0,
+        totalVoted: 0,
+      },
+    });
+  };
+
+  const handleAddDataEntry = () => {
+    if (!newDataEntry.targetId || !newDataEntry.fieldName || !newDataEntry.newValue) return;
+    
+    addDataEntry(newDataEntry);
+    
+    addActivity({
+      userId: currentUser.id,
+      userName: currentUser.fullName,
+      type: 'task_assign',
+      description: `Внесены данные: ${newDataEntry.fieldName} для ${newDataEntry.targetId}`,
+    });
+
+    setShowDataEntryModal(false);
+    setNewDataEntry({
+      type: 'voter_list',
+      targetId: '',
+      fieldName: '',
+      oldValue: '',
+      newValue: '',
+      changedBy: currentUser.id,
+      changedByName: currentUser.fullName,
+    });
+  };
+
+  const handleCreateReport = () => {
+    if (!newReport.title || !newReport.period) return;
+    
+    createReport(newReport);
+    
+    addActivity({
+      userId: currentUser.id,
+      userName: currentUser.fullName,
+      type: 'task_assign',
+      description: `Сформирован отчёт "${newReport.title}" за период ${newReport.period}`,
+    });
+
+    setShowReportModal(false);
+    setNewReport({
+      title: '',
+      type: 'summary',
+      createdBy: currentUser.id,
+      createdByName: currentUser.fullName,
+      period: '',
+      data: {},
+    });
+  };
+
   const handleStatusChange = (taskId: string, status: 'pending' | 'in_progress' | 'completed') => {
     updateTaskStatus(taskId, status);
+    
+    if (status === 'completed') {
+      addActivity({
+        userId: currentUser.id,
+        userName: currentUser.fullName,
+        type: 'task_complete',
+        description: `Завершена задача: ${tasks.find(t => t.id === taskId)?.title}`,
+      });
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -87,6 +239,23 @@ export default function Dashboard() {
   const canAssignTasks = hasPermission('edit_documents');
   const assignableUsers = users.filter(u => u.isActive && u.id !== currentUser.id);
 
+  const formatTimestamp = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'только что';
+    if (diffMins < 60) return `${diffMins} мин назад`;
+    if (diffHours < 24) return `${diffHours} ч назад`;
+    if (diffDays < 7) return `${diffDays} дн назад`;
+    return date.toLocaleDateString('ru-RU');
+  };
+
+  const myActivities = activities.filter(a => a.userId === currentUser.id).slice(0, 10);
+
   return (
     <div className="space-y-6">
       {/* Welcome */}
@@ -101,7 +270,7 @@ export default function Dashboard() {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
-              <span className="text-sm">Сегодня: 15 января 2026</span>
+              <span className="text-sm">Сегодня: {new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
             </div>
             <div className="flex items-center gap-2 bg-white/10 rounded-lg px-3 py-2">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -135,12 +304,12 @@ export default function Dashboard() {
           <button
             key={index}
             onClick={action.action}
-            disabled={action.label === 'Назначить задачу' && !canAssignTasks}
+            disabled={action.disabled}
             className="flex flex-col items-center gap-2 p-4 bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-200 transition-all duration-200 group disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span className="text-3xl group-hover:scale-110 transition-transform">{action.icon}</span>
             <span className="text-sm font-medium text-gray-700 group-hover:text-blue-700">{action.label}</span>
-            {action.label === 'Назначить задачу' && !canAssignTasks && (
+            {action.disabled && (
               <span className="text-[10px] text-gray-400">Нет прав</span>
             )}
           </button>
@@ -237,6 +406,30 @@ export default function Dashboard() {
         )}
       </div>
 
+      {/* Real Activity Log */}
+      {myActivities.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="p-5 border-b border-gray-100">
+            <h3 className="text-lg font-semibold text-gray-800">Журнал активности</h3>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {myActivities.map((activity) => (
+              <div key={activity.id} className="p-4 flex items-center gap-4 hover:bg-gray-50 transition-colors">
+                <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-800">{activity.description}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{formatTimestamp(activity.timestamp)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Assign Task Modal */}
       {showAssignModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowAssignModal(false)}>
@@ -320,6 +513,273 @@ export default function Dashboard() {
                 className="px-4 py-2 bg-blue-700 text-white rounded-xl text-sm font-medium hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Назначить задачу
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Protocol Modal */}
+      {showProtocolModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowProtocolModal(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white">
+              <h3 className="text-lg font-semibold text-gray-800">Создать протокол</h3>
+              <button onClick={() => setShowProtocolModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100">
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Номер протокола *</label>
+                  <input
+                    type="text"
+                    value={newProtocol.number}
+                    onChange={(e) => setNewProtocol({...newProtocol, number: e.target.value})}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Например: 1247"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Номер УИК *</label>
+                  <input
+                    type="text"
+                    value={newProtocol.uikNumber}
+                    onChange={(e) => setNewProtocol({...newProtocol, uikNumber: e.target.value})}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Например: 1247"
+                  />
+                </div>
+              </div>
+              <div className="border-t border-gray-200 pt-4">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">Данные протокола</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Всего избирателей</label>
+                    <input
+                      type="number"
+                      value={newProtocol.data.totalVoters}
+                      onChange={(e) => setNewProtocol({...newProtocol, data: {...newProtocol.data, totalVoters: parseInt(e.target.value) || 0}})}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Получено бюллетеней</label>
+                    <input
+                      type="number"
+                      value={newProtocol.data.receivedBallots}
+                      onChange={(e) => setNewProtocol({...newProtocol, data: {...newProtocol.data, receivedBallots: parseInt(e.target.value) || 0}})}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Проголосовало досрочно</label>
+                    <input
+                      type="number"
+                      value={newProtocol.data.votedEarly}
+                      onChange={(e) => setNewProtocol({...newProtocol, data: {...newProtocol.data, votedEarly: parseInt(e.target.value) || 0}})}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Проголосовало на дому</label>
+                    <input
+                      type="number"
+                      value={newProtocol.data.votedHome}
+                      onChange={(e) => setNewProtocol({...newProtocol, data: {...newProtocol.data, votedHome: parseInt(e.target.value) || 0}})}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Испорчено бюллетеней</label>
+                    <input
+                      type="number"
+                      value={newProtocol.data.spoiledBallots}
+                      onChange={(e) => setNewProtocol({...newProtocol, data: {...newProtocol.data, spoiledBallots: parseInt(e.target.value) || 0}})}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Всего проголосовало</label>
+                    <input
+                      type="number"
+                      value={newProtocol.data.totalVoted}
+                      onChange={(e) => setNewProtocol({...newProtocol, data: {...newProtocol.data, totalVoted: parseInt(e.target.value) || 0}})}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 border-t border-gray-100 flex justify-end gap-3 sticky bottom-0 bg-white">
+              <button
+                onClick={() => setShowProtocolModal(false)}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={handleCreateProtocol}
+                disabled={!newProtocol.number || !newProtocol.uikNumber}
+                className="px-4 py-2 bg-blue-700 text-white rounded-xl text-sm font-medium hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Создать протокол
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Data Entry Modal */}
+      {showDataEntryModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowDataEntryModal(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-800">Внести данные</h3>
+              <button onClick={() => setShowDataEntryModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100">
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Тип данных</label>
+                <select
+                  value={newDataEntry.type}
+                  onChange={(e) => setNewDataEntry({...newDataEntry, type: e.target.value as any})}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="voter_list">Список избирателей</option>
+                  <option value="uik_data">Данные УИК</option>
+                  <option value="candidate_data">Данные кандидата</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">ID объекта *</label>
+                <input
+                  type="text"
+                  value={newDataEntry.targetId}
+                  onChange={(e) => setNewDataEntry({...newDataEntry, targetId: e.target.value})}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Например: УИК-1247"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Поле *</label>
+                <input
+                  type="text"
+                  value={newDataEntry.fieldName}
+                  onChange={(e) => setNewDataEntry({...newDataEntry, fieldName: e.target.value})}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Например: Количество избирателей"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Старое значение</label>
+                  <input
+                    type="text"
+                    value={newDataEntry.oldValue}
+                    onChange={(e) => setNewDataEntry({...newDataEntry, oldValue: e.target.value})}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Необязательно"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Новое значение *</label>
+                  <input
+                    type="text"
+                    value={newDataEntry.newValue}
+                    onChange={(e) => setNewDataEntry({...newDataEntry, newValue: e.target.value})}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Обязательно"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="p-6 border-t border-gray-100 flex justify-end gap-3">
+              <button
+                onClick={() => setShowDataEntryModal(false)}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={handleAddDataEntry}
+                disabled={!newDataEntry.targetId || !newDataEntry.fieldName || !newDataEntry.newValue}
+                className="px-4 py-2 bg-blue-700 text-white rounded-xl text-sm font-medium hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Внести данные
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Report Modal */}
+      {showReportModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowReportModal(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-800">Сформировать отчёт</h3>
+              <button onClick={() => setShowReportModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100">
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Название отчёта *</label>
+                <input
+                  type="text"
+                  value={newReport.title}
+                  onChange={(e) => setNewReport({...newReport, title: e.target.value})}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Введите название отчёта"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Тип отчёта</label>
+                <select
+                  value={newReport.type}
+                  onChange={(e) => setNewReport({...newReport, type: e.target.value as any})}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="summary">Сводный отчёт</option>
+                  <option value="turnout">Отчёт по явке</option>
+                  <option value="processing">Отчёт по обработке</option>
+                  <option value="complaints">Отчёт по жалобам</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Период *</label>
+                <input
+                  type="text"
+                  value={newReport.period}
+                  onChange={(e) => setNewReport({...newReport, period: e.target.value})}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Например: 01.01.2026 - 15.01.2026"
+                />
+              </div>
+            </div>
+            <div className="p-6 border-t border-gray-100 flex justify-end gap-3">
+              <button
+                onClick={() => setShowReportModal(false)}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={handleCreateReport}
+                disabled={!newReport.title || !newReport.period}
+                className="px-4 py-2 bg-blue-700 text-white rounded-xl text-sm font-medium hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Сформировать отчёт
               </button>
             </div>
           </div>

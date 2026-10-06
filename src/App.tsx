@@ -3,6 +3,8 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { DocumentsProvider } from './context/DocumentsContext';
 import { TasksProvider } from './context/TasksContext';
 import { RegistrationsProvider } from './context/RegistrationsContext';
+import { ActivityProvider } from './context/ActivityContext';
+import { OperationsProvider } from './context/OperationsContext';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -74,13 +76,17 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <DocumentsProvider>
-        <TasksProvider>
-          <RegistrationsProvider>
-            <AppContent />
-          </RegistrationsProvider>
-        </TasksProvider>
-      </DocumentsProvider>
+      <ActivityProvider>
+        <DocumentsProvider>
+          <TasksProvider>
+            <RegistrationsProvider>
+              <OperationsProvider>
+                <AppContent />
+              </OperationsProvider>
+            </RegistrationsProvider>
+          </TasksProvider>
+        </DocumentsProvider>
+      </ActivityProvider>
     </AuthProvider>
   );
 }
