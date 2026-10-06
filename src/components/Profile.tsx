@@ -202,7 +202,13 @@ export default function Profile() {
                 </div>
                 <div>
                   <p className="text-xs text-gray-400 uppercase tracking-wider font-medium">Дата регистрации</p>
-                  <p className="text-sm font-medium text-gray-800 mt-1">{currentUser.createdAt}</p>
+                  <p className="text-sm font-medium text-gray-800 mt-1">
+                    {new Date(currentUser.createdAt).toLocaleDateString('ru-RU', {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric',
+                    })}
+                  </p>
                 </div>
               </div>
             </div>

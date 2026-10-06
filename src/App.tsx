@@ -6,6 +6,7 @@ import { RegistrationsProvider } from './context/RegistrationsContext';
 import { ActivityProvider } from './context/ActivityContext';
 import { OperationsProvider } from './context/OperationsContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { NewsProvider } from './context/NewsContext';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -83,7 +84,9 @@ function App() {
             <TasksProvider>
               <RegistrationsProvider>
                 <OperationsProvider>
-                  <AppContent />
+                  <NewsProvider>
+                    <AppContent />
+                  </NewsProvider>
                 </OperationsProvider>
               </RegistrationsProvider>
             </TasksProvider>
