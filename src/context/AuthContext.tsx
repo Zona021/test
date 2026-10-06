@@ -52,11 +52,16 @@ export type Permission =
   | 'delete_documents'
   | 'view_statistics'
   | 'edit_news'
-  | 'manage_settings';
+  | 'manage_settings'
+  | 'manage_contacts'
+  | 'manage_calendar'
+  | 'assign_tasks'
+  | 'review_documents'
+  | 'review_registrations';
 
 const rolePermissions: Record<Role, Permission[]> = {
-  owner: ['manage_users', 'manage_roles', 'manage_positions', 'edit_documents', 'delete_documents', 'view_statistics', 'edit_news', 'manage_settings'],
-  admin: ['manage_users', 'manage_positions', 'edit_documents', 'delete_documents', 'view_statistics', 'edit_news', 'manage_settings'],
+  owner: ['manage_users', 'manage_roles', 'manage_positions', 'edit_documents', 'delete_documents', 'view_statistics', 'edit_news', 'manage_settings', 'manage_contacts', 'manage_calendar', 'assign_tasks', 'review_documents', 'review_registrations'],
+  admin: ['manage_users', 'manage_positions', 'edit_documents', 'delete_documents', 'view_statistics', 'edit_news', 'manage_settings', 'manage_calendar', 'assign_tasks', 'review_documents', 'review_registrations'],
   editor: ['edit_documents', 'view_statistics', 'edit_news'],
   viewer: ['view_statistics'],
 };

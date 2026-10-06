@@ -1,18 +1,23 @@
 import { useState } from 'react';
+import { useCalendar, EventType } from '../context/CalendarContext';
+import { useAuth } from '../context/AuthContext';
 
 export default function CalendarComponent() {
-  const [currentMonth] = useState(new Date(2026, 0)); // January 2026
+  const { events, addEvent, deleteEvent } = useCalendar();
+  const { hasPermission } = useAuth();
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newEvent, setNewEvent] = useState({
+    title: '',
+    date: 15,
+    month: 0,
+    year: 2026,
+    time: '',
+    type: 'meeting' as EventType,
+    location: '',
+    description: '',
+  });
 
-  const events = [
-    { date: 15, title: 'Заседание ЦИК России', time: '10:00', type: 'meeting', location: 'Зал заседаний' },
-    { date: 16, title: 'Проверка протоколов УИК', time: '09:00 - 18:00', type: 'work', location: 'Кабинет 312' },
-    { date: 18, title: 'Видеоконференция с ТИК', time: '14:00', type: 'video', location: 'Онлайн' },
-    { date: 20, title: 'Семинар для членов ТИК', time: '10:00 - 16:00', type: 'seminar', location: 'Конференц-зал' },
-    { date: 22, title: 'Срок подачи документов', time: 'до 18:00', type: 'deadline', location: '' },
-    { date: 25, title: 'Рабочая группа по ГАС', time: '11:00', type: 'meeting', location: 'Зал 5' },
-    { date: 27, title: 'Подготовка отчётности', time: 'Весь день', type: 'work', location: '' },
-    { date: 30, title: 'Коллегия ЦИК', time: '15:00', type: 'meeting', location: 'Большой зал' },
-  ];
+  const currentMonth = new Date(2026, 0);
 
   const getDaysInMonth = (date: Date) => {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
@@ -20,7 +25,7 @@ export default function CalendarComponent() {
 
   const getFirstDayOfMonth = (date: Date) => {
     const day = new Date(date.getFullYear(), date.getMonth(), 1).getDay();
-    return day === 0 ? 6 : day - 1; // Monday = 0
+    return day === 0 ? 6 : day - 1;
   };
 
   const daysInMonth = getDaysInMonth(currentMonth);
@@ -33,9 +38,9 @@ export default function CalendarComponent() {
 
   const weekDays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 
-  const getEventForDay = (day: number) => events.filter(e => e.date === day);
+  const getEventForDay = (day: number) => events.filter(e => e.date === day && e.month === 0 && e.year === 2026);
 
-  const getEventTypeColor = (type: string) => {
+  const getEventTypeColor = (type: EventType) => {
     switch (type) {
       case 'meeting': return 'bg-blue-500';
       case 'work': return 'bg-emerald-500';
@@ -46,18 +51,25 @@ export default function CalendarComponent() {
     }
   };
 
-  const getEventTypeLabel = (type: string) => {
+  const getEventTypeLabel = (type: EventType) => {
     switch (type) {
       case 'meeting': return 'Заседание';
       case 'work': return 'Работа';
       case 'video': return 'ВКС';
       case 'seminar': return 'Семинар';
       case 'deadline': return 'Срок';
-      default: return type;
+      default: return 'Другое';
     }
   };
 
-  const today = 15; // Simulated current day
+  const handleAddEvent = () => {
+    if (!newEvent.title || !newEvent.time) return;
+    addEvent(newEvent);
+    setShowAddModal(false);
+    setNewEvent({ title: '', date: 15, month: 0, year: 2026, time: '', type: 'meeting', location: '', description: '' });
+  };
+
+  const today = 15;
 
   return (
     <div className="space-y-6">
@@ -66,12 +78,17 @@ export default function CalendarComponent() {
           <h2 className="text-2xl font-bold text-gray-800">Календарь событий</h2>
           <p className="text-gray-500 text-sm mt-1">Планирование и расписание мероприятий</p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition-colors text-sm font-medium shadow-sm">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Добавить событие
-        </button>
+        {hasPermission('manage_calendar') && (
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition-colors text-sm font-medium shadow-sm"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Добавить событие
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -143,8 +160,8 @@ export default function CalendarComponent() {
             <h3 className="text-lg font-semibold text-gray-800">Ближайшие события</h3>
           </div>
           <div className="divide-y divide-gray-50 max-h-[500px] overflow-y-auto">
-            {events.map((event, index) => (
-              <div key={index} className="p-4 hover:bg-gray-50 transition-colors">
+            {events.map((event) => (
+              <div key={event.id} className="p-4 hover:bg-gray-50 transition-colors group">
                 <div className="flex items-start gap-3">
                   <div className="flex flex-col items-center">
                     <span className="text-xs text-gray-400">Янв</span>
@@ -167,6 +184,17 @@ export default function CalendarComponent() {
                       </p>
                     )}
                   </div>
+                  {hasPermission('manage_calendar') && (
+                    <button
+                      onClick={() => deleteEvent(event.id)}
+                      className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-50 text-gray-400 hover:text-red-600 transition-all"
+                      title="Удалить"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -179,11 +207,11 @@ export default function CalendarComponent() {
         <h4 className="text-sm font-semibold text-gray-700 mb-3">Обозначения</h4>
         <div className="flex flex-wrap gap-4">
           {[
-            { type: 'meeting', label: 'Заседания' },
-            { type: 'work', label: 'Рабочие дни' },
-            { type: 'video', label: 'ВКС' },
-            { type: 'seminar', label: 'Семинары' },
-            { type: 'deadline', label: 'Сроки' },
+            { type: 'meeting' as EventType, label: 'Заседания' },
+            { type: 'work' as EventType, label: 'Рабочие дни' },
+            { type: 'video' as EventType, label: 'ВКС' },
+            { type: 'seminar' as EventType, label: 'Семинары' },
+            { type: 'deadline' as EventType, label: 'Сроки' },
           ].map(item => (
             <div key={item.type} className="flex items-center gap-2">
               <div className={`w-3 h-3 rounded-full ${getEventTypeColor(item.type)}`}></div>
@@ -192,6 +220,109 @@ export default function CalendarComponent() {
           ))}
         </div>
       </div>
+
+      {/* Add Event Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowAddModal(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-800">Добавить событие</h3>
+              <button onClick={() => setShowAddModal(false)} className="p-2 rounded-lg hover:bg-gray-100">
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Название события *</label>
+                <input
+                  type="text"
+                  value={newEvent.title}
+                  onChange={(e) => setNewEvent({...newEvent, title: e.target.value})}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Введите название"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Дата (число) *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="31"
+                    value={newEvent.date}
+                    onChange={(e) => setNewEvent({...newEvent, date: parseInt(e.target.value)})}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Время *</label>
+                  <input
+                    type="text"
+                    value={newEvent.time}
+                    onChange={(e) => setNewEvent({...newEvent, time: e.target.value})}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="10:00"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Тип события</label>
+                  <select
+                    value={newEvent.type}
+                    onChange={(e) => setNewEvent({...newEvent, type: e.target.value as EventType})}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="meeting">Заседание</option>
+                    <option value="work">Работа</option>
+                    <option value="video">ВКС</option>
+                    <option value="seminar">Семинар</option>
+                    <option value="deadline">Срок</option>
+                    <option value="other">Другое</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Место</label>
+                  <input
+                    type="text"
+                    value={newEvent.location}
+                    onChange={(e) => setNewEvent({...newEvent, location: e.target.value})}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Зал заседаний"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Описание</label>
+                <textarea
+                  value={newEvent.description}
+                  onChange={(e) => setNewEvent({...newEvent, description: e.target.value})}
+                  rows={2}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  placeholder="Дополнительная информация..."
+                />
+              </div>
+            </div>
+            <div className="p-6 border-t border-gray-100 flex justify-end gap-3">
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={handleAddEvent}
+                disabled={!newEvent.title || !newEvent.time}
+                className="px-4 py-2 bg-blue-700 text-white rounded-xl text-sm font-medium hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Добавить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,5 +1,9 @@
 import { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { DocumentsProvider } from './context/DocumentsContext';
+import { TasksProvider } from './context/TasksContext';
+import { CalendarProvider } from './context/CalendarContext';
+import { RegistrationsProvider } from './context/RegistrationsContext';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -12,14 +16,23 @@ import Profile from './components/Profile';
 import Settings from './components/Settings';
 import UserManagement from './components/UserManagement';
 import LoginScreen from './components/LoginScreen';
+import RegistrationScreen from './components/RegistrationScreen';
 
 function AppContent() {
   const { currentUser } = useAuth();
   const [activeSection, setActiveSection] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showRegistration, setShowRegistration] = useState(false);
 
   if (!currentUser) {
-    return <LoginScreen />;
+    return (
+      <>
+        <LoginScreen onRegisterClick={() => setShowRegistration(true)} />
+        {showRegistration && (
+          <RegistrationScreen onClose={() => setShowRegistration(false)} />
+        )}
+      </>
+    );
   }
 
   const renderContent = () => {
@@ -68,7 +81,15 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <DocumentsProvider>
+        <TasksProvider>
+          <CalendarProvider>
+            <RegistrationsProvider>
+              <AppContent />
+            </RegistrationsProvider>
+          </CalendarProvider>
+        </TasksProvider>
+      </DocumentsProvider>
     </AuthProvider>
   );
 }

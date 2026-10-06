@@ -103,7 +103,7 @@ export default function UserManagement() {
     // Only owner can assign admin role or change owner role
     if (targetUser.role === 'owner') return false;
     if (currentUser.role === 'owner') return true;
-    if (currentUser.role === 'admin') return true;
+    // Admin cannot assign admin role
     return false;
   };
 
@@ -288,12 +288,15 @@ export default function UserManagement() {
                   }`}
                 >
                   {currentUser.role === 'owner' && <option value="owner">Владелец</option>}
-                  <option value="admin">Администратор</option>
+                  {currentUser.role === 'owner' && <option value="admin">Администратор</option>}
                   <option value="editor">Редактор</option>
                   <option value="viewer">Просмотр</option>
                 </select>
                 {user.role === 'owner' && (
                   <p className="text-xs text-amber-600 mt-1">Только владелец может изменять роль владельца</p>
+                )}
+                {currentUser.role === 'admin' && !canChangeRole(user) && (
+                  <p className="text-xs text-gray-500 mt-1">Только владелец может изменять роли</p>
                 )}
               </div>
               <div>
@@ -376,10 +379,13 @@ export default function UserManagement() {
                     className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     {currentUser.role === 'owner' && <option value="owner">Владелец</option>}
-                    <option value="admin">Администратор</option>
+                    {currentUser.role === 'owner' && <option value="admin">Администратор</option>}
                     <option value="editor">Редактор</option>
                     <option value="viewer">Просмотр</option>
                   </select>
+                  {currentUser.role === 'admin' && (
+                    <p className="text-xs text-gray-500 mt-1">Администратор не может назначать роль «Администратор»</p>
+                  )}
                 </div>
               </div>
               <div>

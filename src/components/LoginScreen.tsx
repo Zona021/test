@@ -1,7 +1,11 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 
-export default function LoginScreen() {
+interface LoginScreenProps {
+  onRegisterClick?: () => void;
+}
+
+export default function LoginScreen({ onRegisterClick }: LoginScreenProps) {
   const { login, users } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -147,6 +151,14 @@ export default function LoginScreen() {
 
         {/* Footer */}
         <div className="text-center mt-6">
+          {onRegisterClick && (
+            <button
+              onClick={onRegisterClick}
+              className="text-sm text-blue-200 hover:text-white transition-colors mb-3 block mx-auto"
+            >
+              Запросить доступ к системе →
+            </button>
+          )}
           <p className="text-xs text-blue-300/70">© 2026 ЦИК России. Все права защищены.</p>
           <p className="text-xs text-blue-300/50 mt-1">Версия системы 4.2.1</p>
         </div>
