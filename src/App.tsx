@@ -18,6 +18,7 @@ import Contacts from './components/Contacts';
 import Profile from './components/Profile';
 import Settings from './components/Settings';
 import UserManagement from './components/UserManagement';
+import TaskManagement from './components/TaskManagement';
 import Registration from './components/Registration';
 import LoginScreen from './components/LoginScreen';
 
@@ -25,6 +26,7 @@ function AppContent() {
   const { currentUser } = useAuth();
   const [activeSection, setActiveSection] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   if (!currentUser) {
     return <LoginScreen />;
@@ -50,6 +52,8 @@ function AppContent() {
         return <Settings />;
       case 'users':
         return <UserManagement />;
+      case 'tasks':
+        return <TaskManagement />;
       case 'registration':
         return <Registration />;
       default:
@@ -66,8 +70,10 @@ function AppContent() {
           onSectionChange={setActiveSection}
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
+          isCollapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         />
-        <main className="flex-1 p-4 md:p-8 ml-0 md:ml-64 min-h-screen">
+        <main className={`flex-1 p-4 md:p-8 min-h-screen transition-all duration-300 ${sidebarCollapsed ? 'md:ml-20' : 'md:ml-64'}`}>
           {renderContent()}
         </main>
       </div>

@@ -6,9 +6,11 @@ interface SidebarProps {
   onSectionChange: (section: string) => void;
   isOpen: boolean;
   onClose: () => void;
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
 }
 
-export default function Sidebar({ activeSection, onSectionChange, isOpen, onClose }: SidebarProps) {
+export default function Sidebar({ activeSection, onSectionChange, isOpen, onClose, isCollapsed, onToggleCollapse }: SidebarProps) {
   const { currentUser, hasPermission } = useAuth();
 
   const mainMenuItems = [
@@ -22,6 +24,7 @@ export default function Sidebar({ activeSection, onSectionChange, isOpen, onClos
 
   const adminMenuItems: typeof mainMenuItems = hasPermission('manage_users') ? [
     { id: 'users', label: 'Пользователи', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
+    { id: 'tasks', label: 'Все задачи', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' },
   ] : [];
 
   const personalMenuItems = [
@@ -61,78 +64,130 @@ export default function Sidebar({ activeSection, onSectionChange, isOpen, onClos
       )}
       
       <aside className={`
-        fixed md:fixed top-0 left-0 h-full w-64 bg-white border-r border-gray-200 shadow-lg md:shadow-sm
-        transform transition-transform duration-300 ease-in-out z-50
-        ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+        fixed md:fixed top-0 left-0 h-full bg-white border-r border-gray-200 shadow-lg md:shadow-sm
+        transform transition-all duration-300 ease-in-out z-50
+        ${isCollapsed ? 'md:w-20' : 'md:w-64'}
+        ${isOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0'}
       `}>
-        <div className="pt-20 pb-6 px-4 overflow-y-auto h-full">
+        {/* Collapse toggle button */}
+        <button
+          onClick={onToggleCollapse}
+          className="hidden md:flex absolute -right-3 top-20 w-6 h-6 bg-white border border-gray-200 rounded-full items-center justify-center shadow-sm hover:bg-gray-50 transition-colors z-10"
+          title={isCollapsed ? 'Развернуть меню' : 'Свернуть меню'}
+        >
+          <svg 
+            className={`w-3 h-3 text-gray-600 transition-transform ${isCollapsed ? 'rotate-180' : ''}`} 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+
+        <div className={`pt-20 pb-6 px-4 overflow-y-auto h-full ${isCollapsed ? 'flex flex-col items-center' : ''}`}>
           {/* Main navigation */}
-          <nav className="space-y-1">
-            <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold px-4 mb-2">Навигация</p>
+          <nav className="space-y-1 w-full">
+            {!isCollapsed && (
+              <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold px-4 mb-2">Навигация</p>
+            )}
             {allMenuItems.map(item => (
               <button
                 key={item.id}
                 onClick={() => handleItemClick(item.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
+                className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
                   activeSection === item.id
                     ? 'bg-blue-50 text-blue-700 shadow-sm'
                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                 }`}
+                title={isCollapsed ? item.label : ''}
               >
                 <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={activeSection === item.id ? 2 : 1.5} d={item.icon} />
                 </svg>
-                {item.label}
-                {item.id === 'users' && (
-                  <span className="ml-auto px-1.5 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-700 rounded">
-                    {currentUser?.role === 'owner' ? 'ВЛАДЕЛЕЦ' : 'АДМИН'}
-                  </span>
-                )}
-                {activeSection === item.id && (
-                  <div className="ml-auto w-1.5 h-1.5 bg-blue-600 rounded-full"></div>
+                {!isCollapsed && (
+                  <>
+                    {item.label}
+                    {item.id === 'users' && (
+                      <span className="ml-auto px-1.5 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-700 rounded">
+                        {currentUser?.role === 'owner' ? 'ВЛАДЕЛЕЦ' : 'АДМИН'}
+                      </span>
+                    )}
+                    {activeSection === item.id && (
+                      <div className="ml-auto w-1.5 h-1.5 bg-blue-600 rounded-full"></div>
+                    )}
+                  </>
                 )}
               </button>
             ))}
           </nav>
 
           {/* Personal section */}
-          <div className="mt-6">
-            <nav className="space-y-1">
-              <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold px-4 mb-2">Личное</p>
-              {personalMenuItems.map(item => (
-                <button
-                  key={item.id}
-                  onClick={() => handleItemClick(item.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
-                    activeSection === item.id
-                      ? 'bg-blue-50 text-blue-700 shadow-sm'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  }`}
-                >
-                  <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={activeSection === item.id ? 2 : 1.5} d={item.icon} />
-                  </svg>
-                  {item.label}
-                  {activeSection === item.id && (
-                    <div className="ml-auto w-1.5 h-1.5 bg-blue-600 rounded-full"></div>
-                  )}
-                </button>
-              ))}
-            </nav>
-          </div>
+          {!isCollapsed && (
+            <div className="mt-6">
+              <nav className="space-y-1">
+                <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold px-4 mb-2">Личное</p>
+                {personalMenuItems.map(item => (
+                  <button
+                    key={item.id}
+                    onClick={() => handleItemClick(item.id)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
+                      activeSection === item.id
+                        ? 'bg-blue-50 text-blue-700 shadow-sm'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    }`}
+                  >
+                    <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={activeSection === item.id ? 2 : 1.5} d={item.icon} />
+                    </svg>
+                    {item.label}
+                    {activeSection === item.id && (
+                      <div className="ml-auto w-1.5 h-1.5 bg-blue-600 rounded-full"></div>
+                    )}
+                  </button>
+                ))}
+              </nav>
+            </div>
+          )}
+
+          {/* Personal section (collapsed) */}
+          {isCollapsed && (
+            <div className="mt-6 w-full">
+              <nav className="space-y-1">
+                {personalMenuItems.map(item => (
+                  <button
+                    key={item.id}
+                    onClick={() => handleItemClick(item.id)}
+                    className={`w-full flex items-center justify-center px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
+                      activeSection === item.id
+                        ? 'bg-blue-50 text-blue-700 shadow-sm'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    }`}
+                    title={item.label}
+                  >
+                    <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={activeSection === item.id ? 2 : 1.5} d={item.icon} />
+                    </svg>
+                  </button>
+                ))}
+              </nav>
+            </div>
+          )}
         </div>
 
         {/* Bottom info */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-100 bg-white">
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <span className="text-xs font-medium text-gray-600">Система активна</span>
+        {!isCollapsed && (
+          <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-100 bg-white">
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="text-xs font-medium text-gray-600">Система активна</span>
+              </div>
+              <p className="text-xs text-gray-500">Версия системы: 5.0.0</p>
+              <p className="text-xs text-gray-500">Последнее обновление: 15.01.2026</p>
             </div>
-            <p className="text-xs text-gray-500">Версия системы: 4.2.1</p>
-            <p className="text-xs text-gray-500">Последнее обновление: 15.01.2026</p>
           </div>
-        </div>
+        )}
       </aside>
     </>
   );
