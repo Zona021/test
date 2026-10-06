@@ -1,35 +1,44 @@
 import { useState } from 'react';
-import { useCalendar, EventType } from '../context/CalendarContext';
 import { useAuth } from '../context/AuthContext';
 
+interface CalendarEvent {
+  date: number;
+  title: string;
+  time: string;
+  type: string;
+  location: string;
+  createdBy?: string;
+}
+
 export default function CalendarComponent() {
-  const { events, addEvent, deleteEvent } = useCalendar();
-  const { hasPermission } = useAuth();
+  const { currentUser, hasPermission } = useAuth();
+  const [events, setEvents] = useState<CalendarEvent[]>([
+    { date: 15, title: 'Заседание ЦИК России', time: '10:00', type: 'meeting', location: 'Зал заседаний' },
+    { date: 16, title: 'Проверка протоколов УИК', time: '09:00 - 18:00', type: 'work', location: 'Кабинет 312' },
+    { date: 18, title: 'Видеоконференция с ТИК', time: '14:00', type: 'video', location: 'Онлайн' },
+    { date: 20, title: 'Семинар для членов ТИК', time: '10:00 - 16:00', type: 'seminar', location: 'Конференц-зал' },
+    { date: 22, title: 'Срок подачи документов', time: 'до 18:00', type: 'deadline', location: '' },
+    { date: 25, title: 'Рабочая группа по ГАС', time: '11:00', type: 'meeting', location: 'Зал 5' },
+    { date: 27, title: 'Подготовка отчётности', time: 'Весь день', type: 'work', location: '' },
+    { date: 30, title: 'Коллегия ЦИК', time: '15:00', type: 'meeting', location: 'Большой зал' },
+  ]);
+
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newEvent, setNewEvent] = useState({
-    title: '',
+  const [newEvent, setNewEvent] = useState<CalendarEvent>({
     date: 15,
-    month: 0,
-    year: 2026,
+    title: '',
     time: '',
-    type: 'meeting' as EventType,
+    type: 'meeting',
     location: '',
-    description: '',
   });
 
-  const currentMonth = new Date(2026, 0);
+  const canAddEvents = currentUser?.role === 'owner';
 
-  const getDaysInMonth = (date: Date) => {
-    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-  };
+  const getDaysInMonth = () => 31; // January
+  const getFirstDayOfMonth = () => 3; // Wednesday (0=Mon)
 
-  const getFirstDayOfMonth = (date: Date) => {
-    const day = new Date(date.getFullYear(), date.getMonth(), 1).getDay();
-    return day === 0 ? 6 : day - 1;
-  };
-
-  const daysInMonth = getDaysInMonth(currentMonth);
-  const firstDay = getFirstDayOfMonth(currentMonth);
+  const daysInMonth = getDaysInMonth();
+  const firstDay = getFirstDayOfMonth();
   const days = Array.from({ length: 42 }, (_, i) => {
     const dayNum = i - firstDay + 1;
     if (dayNum < 1 || dayNum > daysInMonth) return null;
@@ -37,10 +46,11 @@ export default function CalendarComponent() {
   });
 
   const weekDays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+  const today = 15;
 
-  const getEventForDay = (day: number) => events.filter(e => e.date === day && e.month === 0 && e.year === 2026);
+  const getEventForDay = (day: number) => events.filter(e => e.date === day);
 
-  const getEventTypeColor = (type: EventType) => {
+  const getEventTypeColor = (type: string) => {
     switch (type) {
       case 'meeting': return 'bg-blue-500';
       case 'work': return 'bg-emerald-500';
@@ -51,25 +61,27 @@ export default function CalendarComponent() {
     }
   };
 
-  const getEventTypeLabel = (type: EventType) => {
+  const getEventTypeLabel = (type: string) => {
     switch (type) {
       case 'meeting': return 'Заседание';
       case 'work': return 'Работа';
       case 'video': return 'ВКС';
       case 'seminar': return 'Семинар';
       case 'deadline': return 'Срок';
-      default: return 'Другое';
+      default: return type;
     }
   };
 
   const handleAddEvent = () => {
     if (!newEvent.title || !newEvent.time) return;
-    addEvent(newEvent);
+    setEvents(prev => [...prev, { ...newEvent, createdBy: currentUser?.fullName }].sort((a, b) => a.date - b.date));
     setShowAddModal(false);
-    setNewEvent({ title: '', date: 15, month: 0, year: 2026, time: '', type: 'meeting', location: '', description: '' });
+    setNewEvent({ date: 15, title: '', time: '', type: 'meeting', location: '' });
   };
 
-  const today = 15;
+  const handleDeleteEvent = (index: number) => {
+    setEvents(prev => prev.filter((_, i) => i !== index));
+  };
 
   return (
     <div className="space-y-6">
@@ -78,7 +90,7 @@ export default function CalendarComponent() {
           <h2 className="text-2xl font-bold text-gray-800">Календарь событий</h2>
           <p className="text-gray-500 text-sm mt-1">Планирование и расписание мероприятий</p>
         </div>
-        {hasPermission('manage_calendar') && (
+        {canAddEvents && (
           <button
             onClick={() => setShowAddModal(true)}
             className="flex items-center gap-2 px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition-colors text-sm font-medium shadow-sm"
@@ -88,6 +100,14 @@ export default function CalendarComponent() {
             </svg>
             Добавить событие
           </button>
+        )}
+        {!canAddEvents && (
+          <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg text-xs text-gray-500">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            Только владелец может добавлять события
+          </div>
         )}
       </div>
 
@@ -110,16 +130,12 @@ export default function CalendarComponent() {
             </div>
           </div>
 
-          {/* Week days header */}
           <div className="grid grid-cols-7 gap-1 mb-2">
             {weekDays.map(day => (
-              <div key={day} className="text-center text-xs font-semibold text-gray-500 py-2">
-                {day}
-              </div>
+              <div key={day} className="text-center text-xs font-semibold text-gray-500 py-2">{day}</div>
             ))}
           </div>
 
-          {/* Days grid */}
           <div className="grid grid-cols-7 gap-1">
             {days.map((day, index) => {
               const dayEvents = day ? getEventForDay(day) : [];
@@ -133,16 +149,11 @@ export default function CalendarComponent() {
                 >
                   {day && (
                     <>
-                      <span className={`text-sm font-medium ${isToday ? 'text-blue-700' : 'text-gray-700'}`}>
-                        {day}
-                      </span>
+                      <span className={`text-sm font-medium ${isToday ? 'text-blue-700' : 'text-gray-700'}`}>{day}</span>
                       {dayEvents.length > 0 && (
                         <div className="flex gap-0.5 mt-1">
                           {dayEvents.slice(0, 3).map((event, i) => (
-                            <div
-                              key={i}
-                              className={`w-1.5 h-1.5 rounded-full ${getEventTypeColor(event.type)}`}
-                            ></div>
+                            <div key={i} className={`w-1.5 h-1.5 rounded-full ${getEventTypeColor(event.type)}`}></div>
                           ))}
                         </div>
                       )}
@@ -160,8 +171,8 @@ export default function CalendarComponent() {
             <h3 className="text-lg font-semibold text-gray-800">Ближайшие события</h3>
           </div>
           <div className="divide-y divide-gray-50 max-h-[500px] overflow-y-auto">
-            {events.map((event) => (
-              <div key={event.id} className="p-4 hover:bg-gray-50 transition-colors group">
+            {events.map((event, index) => (
+              <div key={index} className="p-4 hover:bg-gray-50 transition-colors group">
                 <div className="flex items-start gap-3">
                   <div className="flex flex-col items-center">
                     <span className="text-xs text-gray-400">Янв</span>
@@ -178,23 +189,19 @@ export default function CalendarComponent() {
                       <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
                         {event.location}
                       </p>
                     )}
+                    {canAddEvents && (
+                      <button
+                        onClick={() => handleDeleteEvent(index)}
+                        className="mt-1 text-xs text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        Удалить
+                      </button>
+                    )}
                   </div>
-                  {hasPermission('manage_calendar') && (
-                    <button
-                      onClick={() => deleteEvent(event.id)}
-                      className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-50 text-gray-400 hover:text-red-600 transition-all"
-                      title="Удалить"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  )}
                 </div>
               </div>
             ))}
@@ -207,11 +214,11 @@ export default function CalendarComponent() {
         <h4 className="text-sm font-semibold text-gray-700 mb-3">Обозначения</h4>
         <div className="flex flex-wrap gap-4">
           {[
-            { type: 'meeting' as EventType, label: 'Заседания' },
-            { type: 'work' as EventType, label: 'Рабочие дни' },
-            { type: 'video' as EventType, label: 'ВКС' },
-            { type: 'seminar' as EventType, label: 'Семинары' },
-            { type: 'deadline' as EventType, label: 'Сроки' },
+            { type: 'meeting', label: 'Заседания' },
+            { type: 'work', label: 'Рабочие дни' },
+            { type: 'video', label: 'ВКС' },
+            { type: 'seminar', label: 'Семинары' },
+            { type: 'deadline', label: 'Сроки' },
           ].map(item => (
             <div key={item.type} className="flex items-center gap-2">
               <div className={`w-3 h-3 rounded-full ${getEventTypeColor(item.type)}`}></div>
@@ -227,7 +234,7 @@ export default function CalendarComponent() {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
             <div className="p-6 border-b border-gray-100 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-800">Добавить событие</h3>
-              <button onClick={() => setShowAddModal(false)} className="p-2 rounded-lg hover:bg-gray-100">
+              <button onClick={() => setShowAddModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100">
                 <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -235,26 +242,27 @@ export default function CalendarComponent() {
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Название события *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Название *</label>
                 <input
                   type="text"
                   value={newEvent.title}
                   onChange={(e) => setNewEvent({...newEvent, title: e.target.value})}
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Введите название"
+                  placeholder="Введите название события"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Дата (число) *</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="31"
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Дата *</label>
+                  <select
                     value={newEvent.date}
                     onChange={(e) => setNewEvent({...newEvent, date: parseInt(e.target.value)})}
                     className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  >
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
+                      <option key={d} value={d}>{d} января</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Время *</label>
@@ -269,10 +277,10 @@ export default function CalendarComponent() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Тип события</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Тип</label>
                   <select
                     value={newEvent.type}
-                    onChange={(e) => setNewEvent({...newEvent, type: e.target.value as EventType})}
+                    onChange={(e) => setNewEvent({...newEvent, type: e.target.value})}
                     className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="meeting">Заседание</option>
@@ -280,7 +288,6 @@ export default function CalendarComponent() {
                     <option value="video">ВКС</option>
                     <option value="seminar">Семинар</option>
                     <option value="deadline">Срок</option>
-                    <option value="other">Другое</option>
                   </select>
                 </div>
                 <div>
@@ -290,26 +297,13 @@ export default function CalendarComponent() {
                     value={newEvent.location}
                     onChange={(e) => setNewEvent({...newEvent, location: e.target.value})}
                     className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Зал заседаний"
+                    placeholder="Зал, кабинет..."
                   />
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Описание</label>
-                <textarea
-                  value={newEvent.description}
-                  onChange={(e) => setNewEvent({...newEvent, description: e.target.value})}
-                  rows={2}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                  placeholder="Дополнительная информация..."
-                />
-              </div>
             </div>
             <div className="p-6 border-t border-gray-100 flex justify-end gap-3">
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors"
-              >
+              <button onClick={() => setShowAddModal(false)} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors">
                 Отмена
               </button>
               <button

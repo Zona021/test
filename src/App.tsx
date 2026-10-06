@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { DocumentsProvider } from './context/DocumentsContext';
 import { TasksProvider } from './context/TasksContext';
-import { CalendarProvider } from './context/CalendarContext';
 import { RegistrationsProvider } from './context/RegistrationsContext';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
@@ -15,24 +14,16 @@ import Contacts from './components/Contacts';
 import Profile from './components/Profile';
 import Settings from './components/Settings';
 import UserManagement from './components/UserManagement';
+import Registration from './components/Registration';
 import LoginScreen from './components/LoginScreen';
-import RegistrationScreen from './components/RegistrationScreen';
 
 function AppContent() {
   const { currentUser } = useAuth();
   const [activeSection, setActiveSection] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [showRegistration, setShowRegistration] = useState(false);
 
   if (!currentUser) {
-    return (
-      <>
-        <LoginScreen onRegisterClick={() => setShowRegistration(true)} />
-        {showRegistration && (
-          <RegistrationScreen onClose={() => setShowRegistration(false)} />
-        )}
-      </>
-    );
+    return <LoginScreen />;
   }
 
   const renderContent = () => {
@@ -55,6 +46,8 @@ function AppContent() {
         return <Settings />;
       case 'users':
         return <UserManagement />;
+      case 'registration':
+        return <Registration />;
       default:
         return <Dashboard />;
     }
@@ -83,11 +76,9 @@ function App() {
     <AuthProvider>
       <DocumentsProvider>
         <TasksProvider>
-          <CalendarProvider>
-            <RegistrationsProvider>
-              <AppContent />
-            </RegistrationsProvider>
-          </CalendarProvider>
+          <RegistrationsProvider>
+            <AppContent />
+          </RegistrationsProvider>
         </TasksProvider>
       </DocumentsProvider>
     </AuthProvider>

@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { useTasks, TaskStatus, TaskPriority } from '../context/TasksContext';
 import { useAuth } from '../context/AuthContext';
+import { useTasks, TaskPriority } from '../context/TasksContext';
 
 export default function Dashboard() {
-  const { myTasks, tasks, addTask, updateTaskStatus, deleteTask } = useTasks();
   const { currentUser, users, hasPermission } = useAuth();
+  const { tasks, addTask, updateTaskStatus, deleteTask } = useTasks();
   const [showAssignModal, setShowAssignModal] = useState(false);
+
   const [newTask, setNewTask] = useState({
     title: '',
     description: '',
@@ -13,6 +14,13 @@ export default function Dashboard() {
     priority: 'medium' as TaskPriority,
     deadline: '',
   });
+
+  if (!currentUser) return null;
+
+  const myTasks = tasks.filter(t => t.assignedTo === currentUser.id);
+  const pendingTasks = myTasks.filter(t => t.status === 'pending');
+  const inProgressTasks = myTasks.filter(t => t.status === 'in_progress');
+  const completedTasks = myTasks.filter(t => t.status === 'completed');
 
   const stats = [
     { label: 'Избирательных участков', value: '97 248', change: '+12', icon: '🏛️' },
@@ -22,13 +30,35 @@ export default function Dashboard() {
   ];
 
   const quickActions = [
-    { label: 'Создать протокол', icon: '📝' },
-    { label: 'Внести данные', icon: '📥' },
-    { label: 'Сформировать отчёт', icon: '📈' },
-    { label: 'Отправить уведомление', icon: '📨' },
+    { label: 'Создать протокол', icon: '📝', action: () => alert('Создание протокола') },
+    { label: 'Внести данные', icon: '📥', action: () => alert('Внесение данных') },
+    { label: 'Сформировать отчёт', icon: '📈', action: () => alert('Формирование отчёта') },
+    { label: 'Назначить задачу', icon: '📨', action: () => hasPermission('edit_documents') && setShowAssignModal(true) },
   ];
 
-  const getStatusBadge = (status: TaskStatus) => {
+  const handleAddTask = () => {
+    if (!newTask.title || !newTask.assignedTo || !newTask.deadline) return;
+    const assignee = users.find(u => u.id === newTask.assignedTo);
+    if (!assignee) return;
+    addTask({
+      title: newTask.title,
+      description: newTask.description,
+      assignedTo: newTask.assignedTo,
+      assignedToName: assignee.fullName,
+      assignedBy: currentUser.id,
+      assignedByName: currentUser.fullName,
+      priority: newTask.priority,
+      deadline: newTask.deadline,
+    });
+    setShowAssignModal(false);
+    setNewTask({ title: '', description: '', assignedTo: '', priority: 'medium', deadline: '' });
+  };
+
+  const handleStatusChange = (taskId: string, status: 'pending' | 'in_progress' | 'completed') => {
+    updateTaskStatus(taskId, status);
+  };
+
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case 'in_progress':
         return <span className="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-700 rounded-full">В работе</span>;
@@ -36,10 +66,12 @@ export default function Dashboard() {
         return <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded-full">Ожидает</span>;
       case 'completed':
         return <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full">Выполнено</span>;
+      default:
+        return null;
     }
   };
 
-  const getPriorityBadge = (priority: TaskPriority) => {
+  const getPriorityBadge = (priority: string) => {
     switch (priority) {
       case 'high':
         return <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-700 rounded-full">Высокий</span>;
@@ -47,22 +79,13 @@ export default function Dashboard() {
         return <span className="px-2 py-1 text-xs font-medium bg-orange-100 text-orange-700 rounded-full">Средний</span>;
       case 'low':
         return <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded-full">Низкий</span>;
+      default:
+        return null;
     }
   };
 
-  const handleStatusChange = (taskId: string, newStatus: TaskStatus) => {
-    updateTaskStatus(taskId, newStatus);
-  };
-
-  const handleAssignTask = () => {
-    if (!newTask.title || !newTask.assignedTo || !newTask.deadline || !currentUser) return;
-    addTask({
-      ...newTask,
-      assignedBy: currentUser.username,
-    });
-    setShowAssignModal(false);
-    setNewTask({ title: '', description: '', assignedTo: '', priority: 'medium', deadline: '' });
-  };
+  const canAssignTasks = hasPermission('edit_documents');
+  const assignableUsers = users.filter(u => u.isActive && u.id !== currentUser.id);
 
   return (
     <div className="space-y-6">
@@ -71,7 +94,7 @@ export default function Dashboard() {
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/4"></div>
         <div className="absolute bottom-0 left-1/2 w-32 h-32 bg-white/5 rounded-full translate-y-1/2"></div>
         <div className="relative">
-          <h2 className="text-2xl md:text-3xl font-bold mb-2">Добро пожаловать{currentUser ? `, ${currentUser.fullName.split(' ')[1]}` : ''}!</h2>
+          <h2 className="text-2xl md:text-3xl font-bold mb-2">Добро пожаловать, {currentUser.fullName.split(' ')[1]}!</h2>
           <p className="text-blue-100 text-sm md:text-base">Центральная избирательная комиссия Российской Федерации</p>
           <div className="flex flex-wrap gap-4 mt-4">
             <div className="flex items-center gap-2 bg-white/10 rounded-lg px-3 py-2">
@@ -84,7 +107,7 @@ export default function Dashboard() {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span className="text-sm">{myTasks.filter(t => t.status !== 'completed').length} задач на сегодня</span>
+              <span className="text-sm">{pendingTasks.length + inProgressTasks.length} задач на сегодня</span>
             </div>
           </div>
         </div>
@@ -111,113 +134,107 @@ export default function Dashboard() {
         {quickActions.map((action, index) => (
           <button
             key={index}
-            className="flex flex-col items-center gap-2 p-4 bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-200 transition-all duration-200 group"
+            onClick={action.action}
+            disabled={action.label === 'Назначить задачу' && !canAssignTasks}
+            className="flex flex-col items-center gap-2 p-4 bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-200 transition-all duration-200 group disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span className="text-3xl group-hover:scale-110 transition-transform">{action.icon}</span>
             <span className="text-sm font-medium text-gray-700 group-hover:text-blue-700">{action.label}</span>
+            {action.label === 'Назначить задачу' && !canAssignTasks && (
+              <span className="text-[10px] text-gray-400">Нет прав</span>
+            )}
           </button>
         ))}
       </div>
 
-      {/* Tasks */}
+      {/* My Tasks */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="p-5 border-b border-gray-100 flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold text-gray-800">Мои задачи</h3>
-            <p className="text-xs text-gray-500 mt-0.5">
-              {myTasks.filter(t => t.status === 'pending').length} ожидает • {myTasks.filter(t => t.status === 'in_progress').length} в работе • {myTasks.filter(t => t.status === 'completed').length} выполнено
-            </p>
+            <p className="text-xs text-gray-500 mt-0.5">Всего: {myTasks.length} • Ожидает: {pendingTasks.length} • В работе: {inProgressTasks.length} • Выполнено: {completedTasks.length}</p>
           </div>
-          {hasPermission('assign_tasks') && (
+          {canAssignTasks && (
             <button
               onClick={() => setShowAssignModal(true)}
-              className="flex items-center gap-2 px-3 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition-colors text-sm font-medium"
+              className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
-              Назначить задачу
+              Назначить
             </button>
           )}
         </div>
-        <div className="divide-y divide-gray-50">
-          {myTasks.length === 0 ? (
-            <div className="p-8 text-center text-gray-400">
-              <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-              <p className="text-sm">У вас пока нет задач</p>
-            </div>
-          ) : (
-            myTasks.map(task => (
+        
+        {myTasks.length === 0 ? (
+          <div className="p-8 text-center text-gray-400">
+            <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+            <p className="text-sm">У вас пока нет задач</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-50">
+            {myTasks.map(task => (
               <div key={task.id} className="p-4 hover:bg-gray-50 transition-colors">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <p className={`text-sm font-medium ${task.status === 'completed' ? 'text-gray-400 line-through' : 'text-gray-800'}`}>
                         {task.title}
                       </p>
+                      {getPriorityBadge(task.priority)}
+                      {getStatusBadge(task.status)}
                     </div>
                     {task.description && (
-                      <p className="text-xs text-gray-400 mb-1">{task.description}</p>
+                      <p className="text-xs text-gray-500 mt-1">{task.description}</p>
                     )}
-                    <p className="text-xs text-gray-500">Срок: {task.deadline} • Назначил: @{task.assignedBy}</p>
+                    <div className="flex items-center gap-3 mt-2 text-xs text-gray-400">
+                      <span>Срок: {task.deadline}</span>
+                      <span>От: {task.assignedByName}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {getPriorityBadge(task.priority)}
-                    {getStatusBadge(task.status)}
-                    {/* Status change buttons */}
+                  <div className="flex items-center gap-2">
                     {task.status === 'pending' && (
                       <button
                         onClick={() => handleStatusChange(task.id, 'in_progress')}
-                        className="p-1.5 rounded-lg hover:bg-yellow-50 text-gray-400 hover:text-yellow-600 transition-colors"
-                        title="Взять в работу"
+                        className="px-3 py-1.5 bg-yellow-50 text-yellow-700 rounded-lg text-xs font-medium hover:bg-yellow-100 transition-colors"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
+                        Начать
                       </button>
                     )}
                     {task.status === 'in_progress' && (
                       <button
                         onClick={() => handleStatusChange(task.id, 'completed')}
-                        className="p-1.5 rounded-lg hover:bg-green-50 text-gray-400 hover:text-green-600 transition-colors"
-                        title="Завершить"
+                        className="px-3 py-1.5 bg-green-50 text-green-700 rounded-lg text-xs font-medium hover:bg-green-100 transition-colors"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
+                        Завершить
                       </button>
                     )}
                     {task.status === 'completed' && (
                       <button
                         onClick={() => handleStatusChange(task.id, 'pending')}
-                        className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition-colors"
-                        title="Вернуть в ожидание"
+                        className="px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-100 transition-colors"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
+                        Переоткрыть
                       </button>
                     )}
-                    {(task.assignedBy === currentUser?.username || hasPermission('manage_users')) && (
-                      <button
-                        onClick={() => deleteTask(task.id)}
-                        className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors"
-                        title="Удалить"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    )}
+                    <button
+                      onClick={() => deleteTask(task.id)}
+                      className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors"
+                      title="Удалить"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
                   </div>
                 </div>
               </div>
-            ))
-          )}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Assign Task Modal */}
@@ -226,7 +243,7 @@ export default function Dashboard() {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
             <div className="p-6 border-b border-gray-100 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-800">Назначить задачу</h3>
-              <button onClick={() => setShowAssignModal(false)} className="p-2 rounded-lg hover:bg-gray-100">
+              <button onClick={() => setShowAssignModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100">
                 <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -248,9 +265,9 @@ export default function Dashboard() {
                 <textarea
                   value={newTask.description}
                   onChange={(e) => setNewTask({...newTask, description: e.target.value})}
-                  rows={2}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                  placeholder="Опишите задачу подробнее..."
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={3}
+                  placeholder="Опишите задачу подробнее"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -262,8 +279,8 @@ export default function Dashboard() {
                     className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Выберите...</option>
-                    {users.filter(u => u.isActive).map(u => (
-                      <option key={u.id} value={u.username}>@{u.username} ({u.fullName.split(' ').slice(0, 2).join(' ')})</option>
+                    {assignableUsers.map(u => (
+                      <option key={u.id} value={u.id}>{u.fullName}</option>
                     ))}
                   </select>
                 </div>
@@ -283,11 +300,10 @@ export default function Dashboard() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Срок выполнения *</label>
                 <input
-                  type="text"
+                  type="date"
                   value={newTask.deadline}
                   onChange={(e) => setNewTask({...newTask, deadline: e.target.value})}
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="ДД.ММ.ГГГГ"
                 />
               </div>
             </div>
@@ -299,11 +315,11 @@ export default function Dashboard() {
                 Отмена
               </button>
               <button
-                onClick={handleAssignTask}
+                onClick={handleAddTask}
                 disabled={!newTask.title || !newTask.assignedTo || !newTask.deadline}
                 className="px-4 py-2 bg-blue-700 text-white rounded-xl text-sm font-medium hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Назначить
+                Назначить задачу
               </button>
             </div>
           </div>

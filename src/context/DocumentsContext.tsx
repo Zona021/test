@@ -1,71 +1,103 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
-import { useAuth } from './AuthContext';
 
-export type DocStatus = 'pending' | 'approved' | 'rejected';
+export type DocumentStatus = 'pending' | 'approved' | 'rejected';
 
 export interface Document {
   id: string;
   title: string;
-  category: string;
   description: string;
+  category: string;
   format: string;
   size: string;
   uploadedBy: string;
+  uploadedByName: string;
   uploadedAt: string;
-  status: DocStatus;
-  reviewedBy?: string;
-  reviewedAt?: string;
-  reviewComment?: string;
+  status: DocumentStatus;
+  approvedBy?: string;
+  approvedAt?: string;
+  rejectionReason?: string;
 }
 
 interface DocumentsContextType {
   documents: Document[];
-  pendingDocuments: Document[];
-  approvedDocuments: Document[];
   addDocument: (doc: Omit<Document, 'id' | 'uploadedAt' | 'status'>) => void;
-  approveDocument: (docId: string, comment?: string) => void;
-  rejectDocument: (docId: string, comment: string) => void;
+  approveDocument: (docId: string, approvedBy: string) => void;
+  rejectDocument: (docId: string, reason: string) => void;
   deleteDocument: (docId: string) => void;
 }
 
 const initialDocuments: Document[] = [
-  { id: '1', title: 'Федеральный закон №67-ФЗ «Об основных гарантиях избирательных прав»', category: 'laws', description: 'Основной закон о выборах', format: 'PDF', size: '2.4 МБ', uploadedBy: 'Zona', uploadedAt: '12.06.2002', status: 'approved' },
-  { id: '2', title: 'Постановление ЦИК России №247/5678-7 «О порядке финансирования»', category: 'decrees', description: 'Порядок финансирования избирательных кампаний', format: 'PDF', size: '856 КБ', uploadedBy: 'Zona', uploadedAt: '10.01.2026', status: 'approved' },
-  { id: '3', title: 'Инструкция по заполнению формы протокола УИК', category: 'instructions', description: 'Порядок заполнения протоколов', format: 'DOCX', size: '3.2 МБ', uploadedBy: 'ivanov_ps', uploadedAt: '05.01.2026', status: 'approved' },
-  { id: '4', title: 'Шаблон протокола УИК об итогах голосования', category: 'templates', description: 'Форма для ПЭВМ', format: 'XLSX', size: '456 КБ', uploadedBy: 'ivanov_ps', uploadedAt: '03.01.2026', status: 'approved' },
-  { id: '5', title: 'Методические рекомендации по организации видеонаблюдения', category: 'instructions', description: 'Рекомендации для ТИК и УИК', format: 'PDF', size: '2.7 МБ', uploadedBy: 'smirnova_ev', uploadedAt: '15.12.2025', status: 'approved' },
+  {
+    id: '1',
+    title: 'Федеральный закон №67-ФЗ «Об основных гарантиях избирательных прав»',
+    description: 'Основной закон о выборах',
+    category: 'laws',
+    format: 'PDF',
+    size: '2.4 МБ',
+    uploadedBy: '1',
+    uploadedByName: 'Зонов А.В.',
+    uploadedAt: '2020-06-12',
+    status: 'approved',
+    approvedBy: '1',
+    approvedAt: '2020-06-12',
+  },
+  {
+    id: '2',
+    title: 'Постановление ЦИК России №247/5678-7 «О порядке финансирования»',
+    description: 'Порядок финансирования избирательных кампаний',
+    category: 'decrees',
+    format: 'PDF',
+    size: '856 КБ',
+    uploadedBy: '2',
+    uploadedByName: 'Иванов П.С.',
+    uploadedAt: '2026-01-10',
+    status: 'approved',
+    approvedBy: '1',
+    approvedAt: '2026-01-11',
+  },
+  {
+    id: '3',
+    title: 'Инструкция по заполнению формы протокола УИК',
+    description: 'Методические указания по работе с протоколами',
+    category: 'instructions',
+    format: 'DOCX',
+    size: '3.2 МБ',
+    uploadedBy: '3',
+    uploadedByName: 'Смирнова Е.В.',
+    uploadedAt: '2026-01-05',
+    status: 'approved',
+    approvedBy: '2',
+    approvedAt: '2026-01-06',
+  },
 ];
 
 const DocumentsContext = createContext<DocumentsContextType | undefined>(undefined);
 
 export function DocumentsProvider({ children }: { children: ReactNode }) {
-  const { currentUser } = useAuth();
   const [documents, setDocuments] = useState<Document[]>(initialDocuments);
 
   const addDocument = (doc: Omit<Document, 'id' | 'uploadedAt' | 'status'>) => {
     const newDoc: Document = {
       ...doc,
       id: String(Date.now()),
-      uploadedAt: new Date().toLocaleDateString('ru-RU'),
+      uploadedAt: new Date().toISOString().split('T')[0],
       status: 'pending',
     };
     setDocuments(prev => [...prev, newDoc]);
   };
 
-  const approveDocument = (docId: string, comment?: string) => {
-    if (!currentUser) return;
+  const approveDocument = (docId: string, approvedBy: string) => {
     setDocuments(prev => prev.map(doc => 
       doc.id === docId 
-        ? { ...doc, status: 'approved' as DocStatus, reviewedBy: currentUser.username, reviewedAt: new Date().toLocaleDateString('ru-RU'), reviewComment: comment }
+        ? { ...doc, status: 'approved', approvedBy, approvedAt: new Date().toISOString().split('T')[0] }
         : doc
     ));
   };
 
-  const rejectDocument = (docId: string, comment: string) => {
-    if (!currentUser) return;
+  const rejectDocument = (docId: string, reason: string) => {
     setDocuments(prev => prev.map(doc => 
       doc.id === docId 
-        ? { ...doc, status: 'rejected' as DocStatus, reviewedBy: currentUser.username, reviewedAt: new Date().toLocaleDateString('ru-RU'), reviewComment: comment }
+        ? { ...doc, status: 'rejected', rejectionReason: reason }
         : doc
     ));
   };
@@ -74,11 +106,14 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
     setDocuments(prev => prev.filter(doc => doc.id !== docId));
   };
 
-  const pendingDocuments = documents.filter(d => d.status === 'pending');
-  const approvedDocuments = documents.filter(d => d.status === 'approved');
-
   return (
-    <DocumentsContext.Provider value={{ documents, pendingDocuments, approvedDocuments, addDocument, approveDocument, rejectDocument, deleteDocument }}>
+    <DocumentsContext.Provider value={{
+      documents,
+      addDocument,
+      approveDocument,
+      rejectDocument,
+      deleteDocument,
+    }}>
       {children}
     </DocumentsContext.Provider>
   );
@@ -86,6 +121,8 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
 
 export function useDocuments() {
   const context = useContext(DocumentsContext);
-  if (!context) throw new Error('useDocuments must be used within DocumentsProvider');
+  if (!context) {
+    throw new Error('useDocuments must be used within DocumentsProvider');
+  }
   return context;
 }
