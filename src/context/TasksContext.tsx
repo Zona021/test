@@ -3,6 +3,13 @@ import { createContext, useContext, useState, ReactNode } from 'react';
 export type TaskStatus = 'pending' | 'in_progress' | 'completed';
 export type TaskPriority = 'low' | 'medium' | 'high';
 
+export interface TaskFile {
+  name: string;
+  size: string;
+  type: string;
+  content: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -16,6 +23,7 @@ export interface Task {
   deadline: string;
   createdAt: string;
   completedAt?: string;
+  attachments?: TaskFile[];
 }
 
 interface TasksContextType {

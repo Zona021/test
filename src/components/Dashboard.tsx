@@ -13,6 +13,8 @@ export default function Dashboard() {
   const [showProtocolModal, setShowProtocolModal] = useState(false);
   const [showDataEntryModal, setShowDataEntryModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+  const [taskFiles, setTaskFiles] = useState<File[]>([]);
 
   const [newTask, setNewTask] = useState({
     title: '',
@@ -94,11 +96,28 @@ export default function Dashboard() {
     },
   ];
 
-  const handleAddTask = () => {
+  const handleAddTask = async () => {
     if (!newTask.title || !newTask.assignedTo || !newTask.deadline) return;
     const assignee = users.find(u => u.id === newTask.assignedTo);
     if (!assignee) return;
     
+    // Process files
+    const attachments = await Promise.all(
+      taskFiles.map(async (file) => {
+        const content = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.readAsDataURL(file);
+        });
+        return {
+          name: file.name,
+          size: `${(file.size / 1024).toFixed(1)} KB`,
+          type: file.type,
+          content,
+        };
+      })
+    );
+
     addTask({
       title: newTask.title,
       description: newTask.description,
@@ -108,6 +127,7 @@ export default function Dashboard() {
       assignedByName: currentUser.fullName,
       priority: newTask.priority,
       deadline: newTask.deadline,
+      attachments: attachments.length > 0 ? attachments : undefined,
     });
 
     addActivity({
@@ -127,6 +147,7 @@ export default function Dashboard() {
 
     setShowAssignModal(false);
     setNewTask({ title: '', description: '', assignedTo: '', priority: 'medium', deadline: '' });
+    setTaskFiles([]);
   };
 
   const handleCreateProtocol = () => {
@@ -353,63 +374,151 @@ export default function Dashboard() {
           </div>
         ) : (
           <div className="divide-y divide-gray-50">
-            {myTasks.map(task => (
-              <div key={task.id} className="p-4 hover:bg-gray-50 transition-colors">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className={`text-sm font-medium ${task.status === 'completed' ? 'text-gray-400 line-through' : 'text-gray-800'}`}>
-                        {task.title}
-                      </p>
-                      {getPriorityBadge(task.priority)}
-                      {getStatusBadge(task.status)}
-                    </div>
-                    {task.description && (
-                      <p className="text-xs text-gray-500 mt-1">{task.description}</p>
-                    )}
-                    <div className="flex items-center gap-3 mt-2 text-xs text-gray-400">
-                      <span>Срок: {task.deadline}</span>
-                      <span>От: {task.assignedByName}</span>
+            {myTasks.map(task => {
+              const isExpanded = expandedTaskId === task.id;
+              return (
+                <div key={task.id} className="transition-colors">
+                  <div 
+                    className="p-4 hover:bg-gray-50 transition-colors cursor-pointer"
+                    onClick={() => setExpandedTaskId(isExpanded ? null : task.id)}
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <svg 
+                            className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                            fill="none" 
+                            stroke="currentColor" 
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                          <p className={`text-sm font-medium ${task.status === 'completed' ? 'text-gray-400 line-through' : 'text-gray-800'}`}>
+                            {task.title}
+                          </p>
+                          {getPriorityBadge(task.priority)}
+                          {getStatusBadge(task.status)}
+                          {task.attachments && task.attachments.length > 0 && (
+                            <span className="flex items-center gap-1 text-xs text-gray-500">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                              </svg>
+                              {task.attachments.length}
+                            </span>
+                          )}
+                        </div>
+                        {!isExpanded && task.description && (
+                          <p className="text-xs text-gray-500 mt-1 ml-6 line-clamp-1">{task.description}</p>
+                        )}
+                        <div className="flex items-center gap-3 mt-2 text-xs text-gray-400 ml-6">
+                          <span>Срок: {task.deadline}</span>
+                          <span>От: {task.assignedByName}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                        {task.status === 'pending' && (
+                          <button
+                            onClick={() => handleStatusChange(task.id, 'in_progress')}
+                            className="px-3 py-1.5 bg-yellow-50 text-yellow-700 rounded-lg text-xs font-medium hover:bg-yellow-100 transition-colors"
+                          >
+                            Начать
+                          </button>
+                        )}
+                        {task.status === 'in_progress' && (
+                          <button
+                            onClick={() => handleStatusChange(task.id, 'completed')}
+                            className="px-3 py-1.5 bg-green-50 text-green-700 rounded-lg text-xs font-medium hover:bg-green-100 transition-colors"
+                          >
+                            Завершить
+                          </button>
+                        )}
+                        {task.status === 'completed' && (
+                          <button
+                            onClick={() => handleStatusChange(task.id, 'pending')}
+                            className="px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-100 transition-colors"
+                          >
+                            Переоткрыть
+                          </button>
+                        )}
+                        <button
+                          onClick={() => deleteTask(task.id)}
+                          className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors"
+                          title="Удалить"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {task.status === 'pending' && (
-                      <button
-                        onClick={() => handleStatusChange(task.id, 'in_progress')}
-                        className="px-3 py-1.5 bg-yellow-50 text-yellow-700 rounded-lg text-xs font-medium hover:bg-yellow-100 transition-colors"
-                      >
-                        Начать
-                      </button>
-                    )}
-                    {task.status === 'in_progress' && (
-                      <button
-                        onClick={() => handleStatusChange(task.id, 'completed')}
-                        className="px-3 py-1.5 bg-green-50 text-green-700 rounded-lg text-xs font-medium hover:bg-green-100 transition-colors"
-                      >
-                        Завершить
-                      </button>
-                    )}
-                    {task.status === 'completed' && (
-                      <button
-                        onClick={() => handleStatusChange(task.id, 'pending')}
-                        className="px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-100 transition-colors"
-                      >
-                        Переоткрыть
-                      </button>
-                    )}
-                    <button
-                      onClick={() => deleteTask(task.id)}
-                      className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors"
-                      title="Удалить"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  </div>
+                  
+                  {/* Expanded task details */}
+                  {isExpanded && (
+                    <div className="px-4 pb-4 bg-gray-50 border-t border-gray-100">
+                      <div className="pt-4 space-y-4">
+                        {task.description && (
+                          <div>
+                            <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Описание</h4>
+                            <p className="text-sm text-gray-700">{task.description}</p>
+                          </div>
+                        )}
+                        
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          <div>
+                            <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Исполнитель</h4>
+                            <p className="text-sm text-gray-700">{task.assignedToName}</p>
+                          </div>
+                          <div>
+                            <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Назначил</h4>
+                            <p className="text-sm text-gray-700">{task.assignedByName}</p>
+                          </div>
+                          <div>
+                            <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Срок</h4>
+                            <p className="text-sm text-gray-700">{task.deadline}</p>
+                          </div>
+                          <div>
+                            <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Создано</h4>
+                            <p className="text-sm text-gray-700">{task.createdAt}</p>
+                          </div>
+                        </div>
+
+                        {task.attachments && task.attachments.length > 0 && (
+                          <div>
+                            <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">
+                              Прикреплённые файлы ({task.attachments.length})
+                            </h4>
+                            <div className="space-y-2">
+                              {task.attachments.map((file, idx) => (
+                                <div key={idx} className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200">
+                                  <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-gray-800 truncate">{file.name}</p>
+                                    <p className="text-xs text-gray-500">{file.size}</p>
+                                  </div>
+                                  <a
+                                    href={file.content}
+                                    download={file.name}
+                                    className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-100 transition-colors"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    Скачать
+                                  </a>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -506,6 +615,50 @@ export default function Dashboard() {
                   onChange={(e) => setNewTask({...newTask, deadline: e.target.value})}
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Прикреплённые файлы</label>
+                <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center hover:border-blue-400 transition-colors">
+                  <input
+                    type="file"
+                    id="task-file-upload"
+                    multiple
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || []);
+                      setTaskFiles(prev => [...prev, ...files]);
+                    }}
+                    className="hidden"
+                  />
+                  <label htmlFor="task-file-upload" className="cursor-pointer">
+                    <svg className="w-8 h-8 mx-auto text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    <p className="text-sm text-gray-600">Нажмите для выбора файлов</p>
+                    <p className="text-xs text-gray-400 mt-1">Можно выбрать несколько файлов</p>
+                  </label>
+                </div>
+                {taskFiles.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    {taskFiles.map((file, idx) => (
+                      <div key={idx} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
+                        <svg className="w-4 h-4 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <span className="text-sm text-gray-700 flex-1 truncate">{file.name}</span>
+                        <span className="text-xs text-gray-500">{(file.size / 1024).toFixed(1)} KB</span>
+                        <button
+                          type="button"
+                          onClick={() => setTaskFiles(prev => prev.filter((_, i) => i !== idx))}
+                          className="p-1 hover:bg-red-50 rounded text-gray-400 hover:text-red-600 transition-colors"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
             <div className="p-6 border-t border-gray-100 flex justify-end gap-3">
