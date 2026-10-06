@@ -30,6 +30,7 @@ interface TasksContextType {
   tasks: Task[];
   addTask: (task: Omit<Task, 'id' | 'createdAt' | 'status'>) => void;
   updateTaskStatus: (taskId: string, status: TaskStatus) => void;
+  updateTaskDeadline: (taskId: string, newDeadline: string) => void;
   deleteTask: (taskId: string) => void;
   getTasksByUser: (userId: string) => Task[];
 }
@@ -100,6 +101,14 @@ export function TasksProvider({ children }: { children: ReactNode }) {
     ));
   };
 
+  const updateTaskDeadline = (taskId: string, newDeadline: string) => {
+    setTasks(prev => prev.map(task => 
+      task.id === taskId 
+        ? { ...task, deadline: newDeadline }
+        : task
+    ));
+  };
+
   const deleteTask = (taskId: string) => {
     setTasks(prev => prev.filter(task => task.id !== taskId));
   };
@@ -113,6 +122,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       tasks,
       addTask,
       updateTaskStatus,
+      updateTaskDeadline,
       deleteTask,
       getTasksByUser,
     }}>

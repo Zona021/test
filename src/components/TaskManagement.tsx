@@ -5,7 +5,7 @@ import { useActivity } from '../context/ActivityContext';
 
 export default function TaskManagement() {
   const { currentUser, users, hasPermission } = useAuth();
-  const { tasks, updateTaskStatus, deleteTask, addTask } = useTasks();
+  const { tasks, updateTaskStatus, updateTaskDeadline, deleteTask, addTask } = useTasks();
   const { addActivity, addNotification } = useActivity();
   
   const [filterUser, setFilterUser] = useState<string>('all');
@@ -14,6 +14,8 @@ export default function TaskManagement() {
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [taskFiles, setTaskFiles] = useState<File[]>([]);
+  const [extendDeadlineTaskId, setExtendDeadlineTaskId] = useState<string | null>(null);
+  const [newDeadline, setNewDeadline] = useState('');
   
   const [newTask, setNewTask] = useState({
     title: '',
@@ -91,6 +93,32 @@ export default function TaskManagement() {
       message: `${currentUser.fullName} удалил(а) задачу "${task.title}"`,
       type: 'warning',
     });
+  };
+
+  const handleExtendDeadline = () => {
+    if (!extendDeadlineTaskId || !newDeadline) return;
+    
+    const task = tasks.find(t => t.id === extendDeadlineTaskId);
+    if (!task) return;
+
+    updateTaskDeadline(extendDeadlineTaskId, newDeadline);
+    
+    addActivity({
+      userId: currentUser.id,
+      userName: currentUser.fullName,
+      type: 'task_assign',
+      description: `Продлён срок задачи "${task.title}" до ${newDeadline}`,
+    });
+
+    addNotification({
+      userId: task.assignedTo,
+      title: 'Срок задачи изменён',
+      message: `${currentUser.fullName} продлил(а) срок задачи "${task.title}" до ${newDeadline}`,
+      type: 'info',
+    });
+
+    setExtendDeadlineTaskId(null);
+    setNewDeadline('');
   };
 
   const handleAddTask = async () => {
@@ -386,7 +414,24 @@ export default function TaskManagement() {
                           </div>
                           <div>
                             <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Срок</h4>
-                            <p className="text-sm text-gray-700">{task.deadline}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm text-gray-700">{task.deadline}</p>
+                              {task.status !== 'completed' && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setExtendDeadlineTaskId(task.id);
+                                    setNewDeadline(task.deadline);
+                                  }}
+                                  className="p-1 hover:bg-blue-100 rounded text-blue-600 transition-colors"
+                                  title="Продлить срок"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                </button>
+                              )}
+                            </div>
                           </div>
                           <div>
                             <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Создано</h4>
@@ -561,6 +606,52 @@ export default function TaskManagement() {
                 className="px-4 py-2 bg-blue-700 text-white rounded-xl text-sm font-medium hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Назначить задачу
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Extend Deadline Modal */}
+      {extendDeadlineTaskId && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setExtendDeadlineTaskId(null)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-800">Продлить срок задачи</h3>
+              <button onClick={() => setExtendDeadlineTaskId(null)} className="p-1.5 rounded-lg hover:bg-gray-100">
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Новый срок выполнения *</label>
+                <input
+                  type="date"
+                  value={newDeadline}
+                  onChange={(e) => setNewDeadline(e.target.value)}
+                  min={tasks.find(t => t.id === extendDeadlineTaskId)?.deadline}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-xs text-gray-500 mt-2">
+                  Текущий срок: {tasks.find(t => t.id === extendDeadlineTaskId)?.deadline}
+                </p>
+              </div>
+            </div>
+            <div className="p-6 border-t border-gray-100 flex justify-end gap-3">
+              <button
+                onClick={() => setExtendDeadlineTaskId(null)}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={handleExtendDeadline}
+                disabled={!newDeadline}
+                className="px-4 py-2 bg-blue-700 text-white rounded-xl text-sm font-medium hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Продлить срок
               </button>
             </div>
           </div>
