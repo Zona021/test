@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -7,10 +8,19 @@ import Documents from './components/Documents';
 import Statistics from './components/Statistics';
 import Calendar from './components/Calendar';
 import Contacts from './components/Contacts';
+import Profile from './components/Profile';
+import Settings from './components/Settings';
+import UserManagement from './components/UserManagement';
+import LoginScreen from './components/LoginScreen';
 
-function App() {
+function AppContent() {
+  const { currentUser } = useAuth();
   const [activeSection, setActiveSection] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  if (!currentUser) {
+    return <LoginScreen />;
+  }
 
   const renderContent = () => {
     switch (activeSection) {
@@ -26,6 +36,12 @@ function App() {
         return <Calendar />;
       case 'contacts':
         return <Contacts />;
+      case 'profile':
+        return <Profile />;
+      case 'settings':
+        return <Settings />;
+      case 'users':
+        return <UserManagement />;
       default:
         return <Dashboard />;
     }
@@ -46,6 +62,14 @@ function App() {
         </main>
       </div>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 

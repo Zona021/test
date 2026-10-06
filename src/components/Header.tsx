@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 
 interface HeaderProps {
   onMenuToggle: () => void;
 }
 
 export default function Header({ onMenuToggle }: HeaderProps) {
+  const { currentUser, logout } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
 
@@ -13,6 +15,15 @@ export default function Header({ onMenuToggle }: HeaderProps) {
     { id: 2, text: 'Обновлены данные по участкам', time: '1 час назад', type: 'info' },
     { id: 3, text: 'Заседание комиссии перенесено на 18:00', time: '3 часа назад', type: 'warning' },
   ];
+
+  const getRoleBadge = (role: string) => {
+    switch (role) {
+      case 'owner': return <span className="px-1.5 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-700 rounded">ВЛАДЕЛЕЦ</span>;
+      case 'admin': return <span className="px-1.5 py-0.5 text-[10px] font-bold bg-blue-100 text-blue-700 rounded">АДМИН</span>;
+      case 'editor': return <span className="px-1.5 py-0.5 text-[10px] font-bold bg-green-100 text-green-700 rounded">РЕДАКТОР</span>;
+      default: return <span className="px-1.5 py-0.5 text-[10px] font-bold bg-gray-100 text-gray-600 rounded">ПРОСМОТР</span>;
+    }
+  };
 
   return (
     <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
@@ -106,48 +117,93 @@ export default function Header({ onMenuToggle }: HeaderProps) {
           </div>
 
           {/* Profile */}
-          <div className="relative">
-            <button
-              onClick={() => { setShowProfile(!showProfile); setShowNotifications(false); }}
-              className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-100 transition-colors"
-            >
-              <div className="w-8 h-8 bg-blue-700 rounded-full flex items-center justify-center">
-                <span className="text-white text-sm font-medium">ИП</span>
-              </div>
-              <span className="hidden md:block text-sm text-gray-700 font-medium">Иванов П.С.</span>
-            </button>
-            
-            {showProfile && (
-              <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-                <div className="p-4 border-b border-gray-100">
-                  <p className="font-medium text-gray-800">Иванов Пётр Сергеевич</p>
-                  <p className="text-xs text-gray-500">Главный специалист</p>
+          {currentUser && (
+            <div className="relative">
+              <button
+                onClick={() => { setShowProfile(!showProfile); setShowNotifications(false); }}
+                className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                  currentUser.role === 'owner' ? 'bg-gradient-to-br from-amber-500 to-orange-600' :
+                  currentUser.role === 'admin' ? 'bg-gradient-to-br from-blue-600 to-indigo-600' :
+                  'bg-gradient-to-br from-gray-500 to-gray-600'
+                }`}>
+                  <span className="text-white text-sm font-medium">
+                    {currentUser.fullName.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                  </span>
                 </div>
-                <div className="py-2">
-                  <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                    Мой профиль
-                  </button>
-                  <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.313c.725-1.024 2.352-1.024 3.077 0a1.999 1.999 0 002.502.579 1.999 1.999 0 012.502 2.502 1.999 1.999 0 00.579 2.502c1.024.725 1.024 2.352 0 3.077a1.999 1.999 0 00-.579 2.502 1.999 1.999 0 01-2.502 2.502 1.999 1.999 0 00-2.502.579c-1.024.725-2.352 1.024-3.077 0a1.999 1.999 0 00-2.502-.579 1.999 1.999 0 01-2.502-2.502 1.999 1.999 0 00-.579-2.502c-1.024-.725-1.024-2.352 0-3.077a1.999 1.999 0 00.579-2.502 1.999 1.999 0 012.502-2.502 1.999 1.999 0 002.502-.579z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    Настройки
-                  </button>
-                  <hr className="my-2 border-gray-100" />
-                  <button className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                    </svg>
-                    Выйти
-                  </button>
+                <div className="hidden md:block text-left">
+                  <span className="text-sm text-gray-700 font-medium block leading-tight">{currentUser.fullName.split(' ').slice(0, 2).join(' ')}</span>
+                  <span className="text-[10px] text-gray-400">@{currentUser.username}</span>
                 </div>
-              </div>
-            )}
-          </div>
+              </button>
+              
+              {showProfile && (
+                <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+                  <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                        currentUser.role === 'owner' ? 'bg-gradient-to-br from-amber-500 to-orange-600' :
+                        currentUser.role === 'admin' ? 'bg-gradient-to-br from-blue-600 to-indigo-600' :
+                        'bg-gradient-to-br from-gray-500 to-gray-600'
+                      }`}>
+                        <span className="text-white text-sm font-medium">
+                          {currentUser.fullName.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-800 text-sm">{currentUser.fullName}</p>
+                        <div className="flex items-center gap-1 mt-0.5">
+                          {getRoleBadge(currentUser.role)}
+                          <span className="text-xs text-gray-500">@{currentUser.username}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="py-2">
+                    <button
+                      onClick={() => {
+                        // Navigate to profile - this will be handled by parent
+                        const event = new CustomEvent('navigate', { detail: 'profile' });
+                        window.dispatchEvent(event);
+                        setShowProfile(false);
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                    >
+                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                      Мой профиль
+                    </button>
+                    <button
+                      onClick={() => {
+                        const event = new CustomEvent('navigate', { detail: 'settings' });
+                        window.dispatchEvent(event);
+                        setShowProfile(false);
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                    >
+                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.313c.725-1.024 2.352-1.024 3.077 0a1.999 1.999 0 002.502.579 1.999 1.999 0 012.502 2.502 1.999 1.999 0 00.579 2.502c1.024.725 1.024 2.352 0 3.077a1.999 1.999 0 00-.579 2.502 1.999 1.999 0 01-2.502 2.502 1.999 1.999 0 00-2.502.579c-1.024.725-2.352 1.024-3.077 0a1.999 1.999 0 00-2.502-.579 1.999 1.999 0 01-2.502-2.502 1.999 1.999 0 00-.579-2.502c-1.024-.725-1.024-2.352 0-3.077a1.999 1.999 0 00.579-2.502 1.999 1.999 0 012.502-2.502 1.999 1.999 0 002.502-.579z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      Настройки
+                    </button>
+                    <hr className="my-2 border-gray-100" />
+                    <button
+                      onClick={() => { logout(); setShowProfile(false); }}
+                      className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-3"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                      </svg>
+                      Выйти из системы
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </header>
