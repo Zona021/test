@@ -8,7 +8,7 @@ export default function Dashboard() {
   const { currentUser, users, hasPermission } = useAuth();
   const { tasks, addTask, updateTaskStatus, deleteTask } = useTasks();
   const { createProtocol, createReport, addDataEntry } = useOperations();
-  const { addActivity, activities } = useActivity();
+  const { addActivity, activities, addNotification } = useActivity();
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showProtocolModal, setShowProtocolModal] = useState(false);
   const [showDataEntryModal, setShowDataEntryModal] = useState(false);
@@ -115,6 +115,14 @@ export default function Dashboard() {
       userName: currentUser.fullName,
       type: 'task_assign',
       description: `Назначена задача "${newTask.title}" пользователю ${assignee.fullName}`,
+    });
+
+    // Send notification to assignee
+    addNotification({
+      userId: assignee.id,
+      title: 'Новая задача',
+      message: `${currentUser.fullName} назначил(а) вам задачу: "${newTask.title}". Срок: ${newTask.deadline}`,
+      type: 'info',
     });
 
     setShowAssignModal(false);

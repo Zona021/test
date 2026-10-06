@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useAuth, Role, Position } from '../context/AuthContext';
 
 export default function UserManagement() {
-  const { users, currentUser, changeUserRole, changeUserPosition, deleteUser, addUser, hasPermission } = useAuth();
+  const { users, currentUser, changeUserRole, changeUserPosition, changeUserDepartment, deleteUser, addUser, hasPermission } = useAuth();
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingUser, setEditingUser] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -319,8 +319,8 @@ export default function UserManagement() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">Подразделение</label>
                 <select
                   value={user.department}
-                  disabled
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm bg-gray-50 text-gray-500 cursor-not-allowed"
+                  onChange={(e) => changeUserDepartment(user.id, e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   {departments.map(d => (
                     <option key={d} value={d}>{d}</option>

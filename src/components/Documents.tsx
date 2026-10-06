@@ -1,16 +1,19 @@
 import { useState } from 'react';
 import { useDocuments } from '../context/DocumentsContext';
 import { useAuth } from '../context/AuthContext';
+import { useActivity } from '../context/ActivityContext';
 
 export default function Documents() {
   const { documents, addDocument, approveDocument, rejectDocument, deleteDocument } = useDocuments();
-  const { currentUser, hasPermission } = useAuth();
+  const { currentUser, hasPermission, users } = useAuth();
+  const { addActivity, addNotification } = useActivity();
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showModeration, setShowModeration] = useState(false);
   const [rejectModal, setRejectModal] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [viewDocument, setViewDocument] = useState<any | null>(null);
 
   const [newDoc, setNewDoc] = useState({
     title: '',
@@ -20,6 +23,8 @@ export default function Documents() {
     size: '',
     uploadedBy: currentUser?.id || '',
     uploadedByName: currentUser?.fullName || '',
+    fileContent: undefined as string | undefined,
+    fileName: undefined as string | undefined,
   });
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -29,7 +34,25 @@ export default function Documents() {
     if (file) {
       setSelectedFile(file);
       const sizeInMB = (file.size / (1024 * 1024)).toFixed(2);
-      setNewDoc({...newDoc, size: `${sizeInMB} МБ`});
+      
+      // Read file content for text-based files
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const content = event.target?.result as string;
+        setNewDoc(prev => ({
+          ...prev, 
+          size: `${sizeInMB} МБ`,
+          fileContent: content,
+          fileName: file.name,
+        }));
+      };
+      
+      // For text files, read as text; for others, store as data URL
+      if (file.type.startsWith('text/') || file.name.endsWith('.csv')) {
+        reader.readAsText(file);
+      } else {
+        reader.readAsDataURL(file);
+      }
       
       // Auto-detect format
       const ext = file.name.split('.').pop()?.toUpperCase();
@@ -69,6 +92,26 @@ export default function Documents() {
       ...newDoc,
       size: newDoc.size || '1 МБ',
     });
+
+    // Add activity
+    addActivity({
+      userId: currentUser?.id || '',
+      userName: currentUser?.fullName || '',
+      type: 'document_upload',
+      description: `Загружен документ "${newDoc.title}" на модерацию`,
+    });
+
+    // Notify admins and owners about new document
+    const adminsAndOwners = users.filter(u => (u.role === 'admin' || u.role === 'owner') && u.isActive);
+    adminsAndOwners.forEach(admin => {
+      addNotification({
+        userId: admin.id,
+        title: 'Новый документ на модерации',
+        message: `${currentUser?.fullName} загрузил(а) документ "${newDoc.title}" и ожидает вашего одобрения`,
+        type: 'warning',
+      });
+    });
+
     setShowAddModal(false);
     setSelectedFile(null);
     setNewDoc({
@@ -79,18 +122,55 @@ export default function Documents() {
       size: '',
       uploadedBy: currentUser?.id || '',
       uploadedByName: currentUser?.fullName || '',
+      fileContent: undefined,
+      fileName: undefined,
     });
   };
 
   const handleApprove = (docId: string) => {
     if (currentUser) {
       approveDocument(docId, currentUser.id);
+      
+      const doc = documents.find(d => d.id === docId);
+      if (doc) {
+        addActivity({
+          userId: currentUser.id,
+          userName: currentUser.fullName,
+          type: 'document_approve',
+          description: `Одобрен документ "${doc.title}"`,
+        });
+
+        addNotification({
+          userId: doc.uploadedBy,
+          title: 'Документ одобрен',
+          message: `Ваш документ "${doc.title}" был одобрен ${currentUser.fullName}`,
+          type: 'success',
+        });
+      }
     }
   };
 
   const handleReject = () => {
     if (rejectModal && rejectReason) {
+      const doc = documents.find(d => d.id === rejectModal);
       rejectDocument(rejectModal, rejectReason);
+      
+      if (doc && currentUser) {
+        addActivity({
+          userId: currentUser.id,
+          userName: currentUser.fullName,
+          type: 'document_reject',
+          description: `Отклонён документ "${doc.title}": ${rejectReason}`,
+        });
+
+        addNotification({
+          userId: doc.uploadedBy,
+          title: 'Документ отклонён',
+          message: `Ваш документ "${doc.title}" был отклонён. Причина: ${rejectReason}`,
+          type: 'error',
+        });
+      }
+      
       setRejectModal(null);
       setRejectReason('');
     }
@@ -232,6 +312,17 @@ export default function Documents() {
                   </td>
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-2">
+                      {/* View button - always visible */}
+                      <button
+                        onClick={() => setViewDocument(doc)}
+                        className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition-colors"
+                        title="Просмотр"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                      </button>
                       {doc.status === 'pending' && canModerate && (
                         <>
                           <button
@@ -450,6 +541,98 @@ export default function Documents() {
                 className="px-4 py-2 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Отклонить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Document Modal */}
+      {viewDocument && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setViewDocument(null)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800">{viewDocument.title}</h3>
+                <p className="text-sm text-gray-500 mt-1">{viewDocument.description}</p>
+              </div>
+              <button onClick={() => setViewDocument(null)} className="p-1.5 rounded-lg hover:bg-gray-100">
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto flex-1">
+              {/* Document info */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 p-4 bg-gray-50 rounded-xl">
+                <div>
+                  <p className="text-xs text-gray-500">Формат</p>
+                  <p className="text-sm font-medium text-gray-800">{viewDocument.format}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Размер</p>
+                  <p className="text-sm font-medium text-gray-800">{viewDocument.size}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Загружен</p>
+                  <p className="text-sm font-medium text-gray-800">{viewDocument.uploadedAt}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Автор</p>
+                  <p className="text-sm font-medium text-gray-800">{viewDocument.uploadedByName}</p>
+                </div>
+              </div>
+
+              {/* File content preview */}
+              {viewDocument.fileContent ? (
+                <div className="border border-gray-200 rounded-xl overflow-hidden">
+                  {viewDocument.fileContent.startsWith('data:') ? (
+                    // Binary file (PDF, images, etc.)
+                    viewDocument.format === 'PDF' ? (
+                      <iframe 
+                        src={viewDocument.fileContent} 
+                        className="w-full h-[500px]"
+                        title={viewDocument.title}
+                      />
+                    ) : (
+                      <div className="p-8 text-center bg-gray-50">
+                        <svg className="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <p className="text-sm text-gray-600 mb-2">Файл: {viewDocument.fileName || 'document'}</p>
+                        <p className="text-xs text-gray-400">Предварительный просмотр для данного формата недоступен</p>
+                        <a 
+                          href={viewDocument.fileContent} 
+                          download={viewDocument.fileName || viewDocument.title}
+                          className="inline-block mt-4 px-4 py-2 bg-blue-700 text-white rounded-lg text-sm font-medium hover:bg-blue-800 transition-colors"
+                        >
+                          Скачать файл
+                        </a>
+                      </div>
+                    )
+                  ) : (
+                    // Text file
+                    <pre className="p-4 bg-gray-900 text-gray-100 text-sm overflow-x-auto max-h-[500px] overflow-y-auto">
+                      <code>{viewDocument.fileContent}</code>
+                    </pre>
+                  )}
+                </div>
+              ) : (
+                <div className="p-8 text-center bg-gray-50 rounded-xl">
+                  <svg className="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <p className="text-sm text-gray-600">Содержимое файла недоступно для просмотра</p>
+                  <p className="text-xs text-gray-400 mt-1">Этот документ был загружен до обновления системы</p>
+                </div>
+              )}
+            </div>
+            <div className="p-4 border-t border-gray-100 flex justify-end flex-shrink-0">
+              <button
+                onClick={() => setViewDocument(null)}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors"
+              >
+                Закрыть
               </button>
             </div>
           </div>

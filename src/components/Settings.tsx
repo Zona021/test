@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 
 export default function Settings() {
   const { currentUser, hasPermission } = useAuth();
+  const { theme, setTheme, resolvedTheme } = useTheme();
   const [activeTab, setActiveTab] = useState('general');
   const [saved, setSaved] = useState(false);
 
@@ -174,19 +176,38 @@ export default function Settings() {
                 <div className="p-4 bg-gray-50 rounded-xl">
                   <p className="text-sm font-medium text-gray-800 mb-3">Тема оформления</p>
                   <div className="grid grid-cols-3 gap-3">
-                    <button className="p-4 border-2 border-blue-500 rounded-xl bg-white text-center">
+                    <button 
+                      onClick={() => setTheme('light')}
+                      className={`p-4 border-2 rounded-xl bg-white text-center transition-all ${
+                        theme === 'light' ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200 hover:border-gray-400'
+                      }`}
+                    >
                       <div className="w-full h-8 bg-white border border-gray-200 rounded mb-2"></div>
                       <span className="text-xs font-medium text-gray-700">Светлая</span>
                     </button>
-                    <button className="p-4 border-2 border-gray-200 rounded-xl bg-gray-800 text-center hover:border-gray-400 transition-colors">
+                    <button 
+                      onClick={() => setTheme('dark')}
+                      className={`p-4 border-2 rounded-xl bg-gray-800 text-center transition-all ${
+                        theme === 'dark' ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200 hover:border-gray-400'
+                      }`}
+                    >
                       <div className="w-full h-8 bg-gray-700 rounded mb-2"></div>
                       <span className="text-xs font-medium text-gray-300">Тёмная</span>
                     </button>
-                    <button className="p-4 border-2 border-gray-200 rounded-xl text-center hover:border-gray-400 transition-colors" style={{background: 'linear-gradient(135deg, #fff 50%, #1f2937 50%)'}}>
+                    <button 
+                      onClick={() => setTheme('auto')}
+                      className={`p-4 border-2 rounded-xl text-center transition-all ${
+                        theme === 'auto' ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200 hover:border-gray-400'
+                      }`}
+                      style={{background: 'linear-gradient(135deg, #fff 50%, #1f2937 50%)'}}
+                    >
                       <div className="w-full h-8 rounded mb-2" style={{background: 'linear-gradient(90deg, #fff 50%, #1f2937 50%)'}}></div>
                       <span className="text-xs font-medium text-gray-700">Авто</span>
                     </button>
                   </div>
+                  <p className="text-xs text-gray-500 mt-3">
+                    {theme === 'auto' ? `Автоматически (сейчас: ${resolvedTheme === 'dark' ? 'тёмная' : 'светлая'})` : `Выбрана: ${theme === 'light' ? 'светлая' : 'тёмная'} тема`}
+                  </p>
                 </div>
               </div>
             )}

@@ -16,6 +16,8 @@ export interface Document {
   approvedBy?: string;
   approvedAt?: string;
   rejectionReason?: string;
+  fileContent?: string;
+  fileName?: string;
 }
 
 interface DocumentsContextType {

@@ -41,6 +41,7 @@ interface AuthContextType {
   addUser: (user: Omit<User, 'id' | 'createdAt' | 'lastLogin'>) => void;
   changeUserRole: (userId: string, newRole: Role) => void;
   changeUserPosition: (userId: string, newPosition: Position) => void;
+  changeUserDepartment: (userId: string, newDepartment: string) => void;
   hasPermission: (permission: Permission) => boolean;
 }
 
@@ -202,6 +203,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const changeUserDepartment = (userId: string, newDepartment: string) => {
+    setUsers(prev => prev.map(u => u.id === userId ? { ...u, department: newDepartment } : u));
+    if (currentUser?.id === userId) {
+      setCurrentUser(prev => prev ? { ...prev, department: newDepartment } : null);
+    }
+  };
+
   const hasPermission = (permission: Permission): boolean => {
     if (!currentUser) return false;
     return rolePermissions[currentUser.role].includes(permission);
@@ -218,6 +226,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       addUser,
       changeUserRole,
       changeUserPosition,
+      changeUserDepartment,
       hasPermission,
     }}>
       {children}

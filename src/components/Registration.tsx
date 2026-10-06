@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useRegistrations } from '../context/RegistrationsContext';
 import { useAuth } from '../context/AuthContext';
+import { useActivity } from '../context/ActivityContext';
 
 export default function Registration() {
   const { registrations, submitRegistration, approveRegistration, rejectRegistration } = useRegistrations();
-  const { currentUser, hasPermission } = useAuth();
+  const { currentUser, hasPermission, users } = useAuth();
+  const { addActivity, addNotification } = useActivity();
   const [showForm, setShowForm] = useState(!currentUser);
   const [showModeration, setShowModeration] = useState(false);
   const [rejectModal, setRejectModal] = useState<string | null>(null);
@@ -36,6 +38,26 @@ export default function Registration() {
   const handleSubmit = () => {
     if (!formData.username || !formData.fullName || !formData.email || !formData.reason) return;
     submitRegistration(formData);
+    
+    // Add activity
+    addActivity({
+      userId: currentUser?.id || 'anonymous',
+      userName: currentUser?.fullName || formData.fullName,
+      type: 'registration_submit',
+      description: `Подана заявка на регистрацию от ${formData.fullName} (@${formData.username})`,
+    });
+
+    // Notify admins and owners
+    const adminsAndOwners = users.filter(u => (u.role === 'admin' || u.role === 'owner') && u.isActive);
+    adminsAndOwners.forEach(admin => {
+      addNotification({
+        userId: admin.id,
+        title: 'Новая заявка на регистрацию',
+        message: `${formData.fullName} (@${formData.username}) подал(а) заявку на регистрацию`,
+        type: 'warning',
+      });
+    });
+
     setSubmitted(true);
     setFormData({ username: '', fullName: '', email: '', phone: '', position: '', department: '', reason: '' });
   };
@@ -43,12 +65,47 @@ export default function Registration() {
   const handleApprove = (regId: string) => {
     if (currentUser) {
       approveRegistration(regId, currentUser.id);
+      
+      const reg = registrations.find(r => r.id === regId);
+      if (reg) {
+        addActivity({
+          userId: currentUser.id,
+          userName: currentUser.fullName,
+          type: 'registration_approve',
+          description: `Одобрена регистрация ${reg.fullName} (@${reg.username})`,
+        });
+
+        addNotification({
+          userId: currentUser.id,
+          title: 'Заявка одобрена',
+          message: `Вы одобрили регистрацию ${reg.fullName} (@${reg.username})`,
+          type: 'success',
+        });
+      }
     }
   };
 
   const handleReject = () => {
     if (rejectModal && rejectReason) {
+      const reg = registrations.find(r => r.id === rejectModal);
       rejectRegistration(rejectModal, rejectReason);
+      
+      if (reg && currentUser) {
+        addActivity({
+          userId: currentUser.id,
+          userName: currentUser.fullName,
+          type: 'registration_reject',
+          description: `Отклонена регистрация ${reg.fullName} (@${reg.username}): ${rejectReason}`,
+        });
+
+        addNotification({
+          userId: currentUser.id,
+          title: 'Заявка отклонена',
+          message: `Вы отклонили регистрацию ${reg.fullName} (@${reg.username}). Причина: ${rejectReason}`,
+          type: 'error',
+        });
+      }
+      
       setRejectModal(null);
       setRejectReason('');
     }
